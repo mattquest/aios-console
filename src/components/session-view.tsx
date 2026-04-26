@@ -89,11 +89,12 @@ function SessionHeader({
       data-testid="session-header"
       className="shrink-0 border-b border-border/70 bg-background/60 backdrop-blur-sm"
     >
-      <div className="px-5 py-3 flex items-center gap-4">
+      <div className="px-4 py-2.5 flex items-center gap-4">
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          <span className="text-hairline text-muted-foreground shrink-0">
-            session
+          <span className="text-pico text-muted-foreground/70 shrink-0">
+            sid
           </span>
+          <span className="text-muted-foreground/40 shrink-0">›</span>
           <span className="font-mono text-[11px] text-foreground/90 truncate">
             {session?.id ?? "…"}
           </span>
@@ -106,26 +107,24 @@ function SessionHeader({
         </div>
 
         {session?.agent_version != null && (
-          <span className="font-mono text-[10px] text-muted-foreground border border-border/60 rounded-sm px-1.5 py-0.5 tracking-wider uppercase shrink-0">
+          <span className="font-mono text-[10px] text-muted-foreground/90 border border-border/60 rounded-sm px-1.5 py-0.5 tracking-[0.14em] uppercase shrink-0 tabular-nums">
             v{session.agent_version}
           </span>
         )}
 
-        <div className="flex items-center gap-5 shrink-0">
-          <Stat label="events" value={stats.events} />
-          <Stat label="spans" value={stats.spans} />
-          <Stat label="tools" value={stats.tools} />
+        <div className="flex items-center gap-4 shrink-0">
+          <Stat label="evt" value={stats.events} />
+          <Stat label="spn" value={stats.spans} />
+          <Stat label="tool" value={stats.tools} />
           <div className="h-4 w-px bg-border/60" />
-          <div className="flex items-center gap-2 text-hairline text-muted-foreground">
+          <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
             <span
               className={cn(
                 "size-1.5 rounded-full",
-                connected
-                  ? "bg-signal animate-signal"
-                  : "bg-signal-warn",
+                connected ? "bg-signal animate-signal" : "bg-signal-warn",
               )}
             />
-            <span>{connected ? "sse/live" : "sse/idle"}</span>
+            <span>sse/{connected ? "live" : "idle"}</span>
           </div>
         </div>
       </div>
@@ -153,10 +152,10 @@ function deriveStats(events: AiosEvent[]): SessionStats {
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="flex items-baseline gap-2">
-      <span className="text-hairline text-muted-foreground">{label}</span>
+    <div className="flex items-baseline gap-1.5">
+      <span className="text-pico text-muted-foreground/70">{label}</span>
       <span className="font-mono text-[12px] tabular-nums text-foreground">
-        {String(value).padStart(2, "0")}
+        {String(value).padStart(3, "0")}
       </span>
     </div>
   );
@@ -175,9 +174,12 @@ function StatusPill({ status }: { status?: Session["status"] }) {
   };
   const entry = status ? map[status] : null;
   return (
-    <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+    <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-foreground/85 border border-border/60 rounded-sm px-1.5 py-0.5">
       <span
-        className={cn("size-1.5 rounded-full", entry?.color ?? "bg-muted-foreground/40")}
+        className={cn(
+          "size-1.5 rounded-full",
+          entry?.color ?? "bg-muted-foreground/40",
+        )}
       />
       <span>{entry?.label ?? "…"}</span>
     </div>

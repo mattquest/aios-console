@@ -43,10 +43,15 @@ export function Composer({ sessionId, status }: Props) {
     }
   };
 
+  const chars = value.length;
+
   return (
     <div className="border-t border-border/60 bg-background/70 backdrop-blur-sm">
-      <div className="max-w-3xl mx-auto px-8 py-4">
+      <div className="max-w-3xl mx-auto px-6 lg:px-8 py-4">
         <div className="relative rounded-sm border border-border/60 bg-card/30 focus-within:border-signal/60 transition-colors">
+          <div className="absolute left-3 top-2.5 font-mono text-[12px] text-signal/80 select-none pointer-events-none">
+            {running ? "›" : "$"}
+          </div>
           <Textarea
             data-testid="composer-input"
             value={value}
@@ -57,14 +62,16 @@ export function Composer({ sessionId, status }: Props) {
                 void send();
               }
             }}
-            placeholder="send a message · enter to submit · shift+enter newline"
+            placeholder="type a message · ⏎ send · ⇧⏎ newline"
             rows={2}
-            className="font-sans text-[13px] resize-none border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 pb-10"
+            className="font-sans text-[13px] resize-none border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 pl-7 pb-10"
           />
           <div className="absolute inset-x-2 bottom-1.5 flex items-center justify-between gap-2">
-            <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+            <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground flex items-center gap-3">
               {error ? (
-                <span className="text-signal-alert">{error}</span>
+                <span className="text-signal-alert normal-case tracking-normal">
+                  {error}
+                </span>
               ) : (
                 <span className="flex items-center gap-1.5">
                   <span
@@ -79,6 +86,9 @@ export function Composer({ sessionId, status }: Props) {
                   {status}
                 </span>
               )}
+              <span className="text-muted-foreground/40 tabular-nums normal-case tracking-normal">
+                {String(chars).padStart(3, "0")} ch
+              </span>
             </div>
             {running ? (
               <Button
@@ -100,7 +110,7 @@ export function Composer({ sessionId, status }: Props) {
                 data-testid="composer-send"
               >
                 <Send className="size-3" />
-                {submitting ? "sending" : "send"}
+                {submitting ? "sending" : "send ⏎"}
               </Button>
             )}
           </div>

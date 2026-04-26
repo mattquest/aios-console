@@ -124,16 +124,44 @@ function GeneratingBars() {
 
 function ChatEmptyState() {
   return (
-    <div className="pt-16 text-center space-y-3">
-      <div
-        className="text-display text-5xl text-muted-foreground/50 italic"
-        style={{ fontVariationSettings: '"opsz" 144, "SOFT" 100' }}
-      >
-        Say something.
+    <div className="pt-12 max-w-xl mx-auto animate-rise">
+      <div className="rounded-sm border border-border/60 bg-card/40 backdrop-blur-sm overflow-hidden">
+        <div className="px-4 py-2 flex items-center justify-between border-b border-border/50 text-pico text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span className="size-1.5 rounded-full bg-signal animate-signal" />
+            <span>session/idle</span>
+          </div>
+          <span className="normal-case tracking-[0.12em]">awaiting stdin</span>
+        </div>
+        <div className="px-4 py-5 space-y-4">
+          <div className="font-mono text-[12px] text-foreground/90 leading-relaxed">
+            <span className="text-signal">$</span>{" "}
+            <span className="text-muted-foreground">
+              compose your first message below.
+            </span>
+            <span className="inline-block w-[6px] h-[1em] bg-signal/70 ml-1 align-text-bottom animate-signal" />
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-muted-foreground/80">
+            <Hint kbd="⏎" label="send" />
+            <Hint kbd="⇧ ⏎" label="newline" />
+            <Hint kbd="esc" label="blur" />
+            <Hint kbd="⌘ K" label="commands" />
+          </div>
+        </div>
       </div>
-      <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/50">
-        <span className="bracket-label">stdin</span>waiting for first user message
-      </div>
+    </div>
+  );
+}
+
+function Hint({ kbd, label }: { kbd: string; label: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <kbd className="inline-flex items-center justify-center min-w-[28px] h-5 px-1.5 rounded-[3px] border border-border/70 bg-background/60 text-foreground/80 text-[9px] tabular-nums">
+        {kbd}
+      </kbd>
+      <span className="text-muted-foreground/70 uppercase tracking-[0.14em]">
+        {label}
+      </span>
     </div>
   );
 }

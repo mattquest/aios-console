@@ -30,21 +30,25 @@ export default function EnvironmentsPage() {
 
   return (
     <main className="flex-1 min-w-0 overflow-y-auto">
-      <div className="max-w-5xl mx-auto px-8 py-10 space-y-6 animate-rise">
+      <div className="max-w-5xl mx-auto px-6 lg:px-8 py-10 space-y-6 animate-rise">
         <header className="flex items-end justify-between gap-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3 text-hairline text-muted-foreground">
-              <span className="tabular-nums text-signal">03</span>
-              <span className="h-px w-8 bg-border" />
-              <span>resource · environments</span>
+          <div className="space-y-3 min-w-0">
+            <div className="flex items-center gap-2 text-pico text-muted-foreground">
+              <span className="text-signal">//</span>
+              <span>resource/environments</span>
+              <span className="text-muted-foreground/40">·</span>
+              <span className="tabular-nums normal-case tracking-[0.12em]">
+                /03
+              </span>
             </div>
-            <h1
-              className="text-display text-5xl tracking-tight"
-              style={{ fontVariationSettings: '"opsz" 144, "SOFT" 100' }}
-            >
-              Environments
+            <h1 className="text-display text-[clamp(1.5rem,2.6vw,2rem)] leading-tight tracking-[-0.025em] text-foreground">
+              <span className="text-muted-foreground/50">›</span> environments
+              <span className="text-muted-foreground/40 font-normal">
+                {" "}
+                — sandbox · network · mounts
+              </span>
             </h1>
-            <p className="font-sans text-sm text-muted-foreground max-w-xl">
+            <p className="font-sans text-[13.5px] text-muted-foreground max-w-xl leading-[1.6]">
               Sandbox container configuration — pre-installed packages, network
               policies, bind mounts. Most setups only need one named{" "}
               <span className="font-mono text-foreground">default</span>.
@@ -70,20 +74,29 @@ export default function EnvironmentsPage() {
           </div>
         )}
         {!loading && !error && environments.length === 0 && (
-          <div className="border border-dashed border-border/60 rounded-sm px-8 py-16 text-center space-y-4">
-            <div
-              className="text-display text-4xl text-muted-foreground/60"
-              style={{ fontVariationSettings: '"opsz" 144, "SOFT" 100' }}
-            >
-              No environments yet
+          <div className="rounded-sm border border-border/60 bg-card/30 backdrop-blur-sm overflow-hidden max-w-2xl">
+            <div className="px-4 py-2 flex items-center justify-between border-b border-border/50 text-pico text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <span className="size-1.5 rounded-full bg-muted-foreground/40" />
+                <span>resource/environments</span>
+              </div>
+              <span className="normal-case tracking-[0.12em]">empty</span>
             </div>
-            <p className="font-sans text-sm text-muted-foreground max-w-md mx-auto">
-              Click{" "}
-              <span className="text-foreground font-mono">
-                + new environment
-              </span>{" "}
-              above. A default-named environment is all most setups need.
-            </p>
+            <div className="px-4 py-5 space-y-3">
+              <div className="font-mono text-[12px] text-foreground/90 leading-relaxed">
+                <span className="text-signal">$</span>{" "}
+                <span className="text-muted-foreground">
+                  no environments registered.
+                </span>
+              </div>
+              <p className="font-sans text-[13px] text-muted-foreground max-w-md leading-[1.6]">
+                Click{" "}
+                <span className="text-foreground font-mono">
+                  + new environment
+                </span>{" "}
+                above. A default-named environment is all most setups need.
+              </p>
+            </div>
           </div>
         )}
         {!loading && !error && environments.length > 0 && (
@@ -94,14 +107,11 @@ export default function EnvironmentsPage() {
                 className="group border border-border/60 rounded-sm bg-card/30 hover:bg-card/60 hover:border-signal/40 transition-colors p-5 flex items-center justify-between gap-6"
                 data-testid={`environment-${e.id}`}
               >
-                <div className="flex items-center gap-4 min-w-0">
-                  <span className="font-mono text-[9px] text-muted-foreground/70 tabular-nums">
-                    {String(i + 1).padStart(2, "0")}
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="font-mono text-[9px] text-muted-foreground/60 tabular-nums">
+                    /{String(i + 1).padStart(2, "0")}
                   </span>
-                  <h3
-                    className="text-display text-2xl tracking-tight"
-                    style={{ fontVariationSettings: '"opsz" 36, "SOFT" 60' }}
-                  >
+                  <h3 className="font-mono text-[15px] tracking-[-0.01em] text-foreground">
                     {e.name}
                   </h3>
                 </div>

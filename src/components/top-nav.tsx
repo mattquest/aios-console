@@ -2,29 +2,36 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn, toErrorMessage } from "@/lib/utils";
 
 type HealthResp =
   | { state: "probing" }
-  | { state: "ok" }
+  | { state: "ok"; latencyMs: number }
   | { state: "error"; error: string };
 
 export function TopNav() {
   const pathname = usePathname();
   const [health, setHealth] = useState<HealthResp>({ state: "probing" });
+  // Build epoch is captured once per page load and rendered as a small
+  // mono-uptime readout in the wordmark cluster — pure visual telemetry,
+  // not load-bearing.
+  const bootRef = useRef(Date.now());
+  const [uptime, setUptime] = useState("00:00");
 
   useEffect(() => {
     let cancelled = false;
     const probe = async () => {
+      const t0 = performance.now();
       try {
         const r = await fetch("/api/aios/v1/agents?limit=1", {
           cache: "no-store",
         });
+        const dt = Math.round(performance.now() - t0);
         if (!cancelled) {
           setHealth(
             r.ok
-              ? { state: "ok" }
+              ? { state: "ok", latencyMs: dt }
               : { state: "error", error: `${r.status} ${r.statusText}` },
           );
         }
@@ -38,6 +45,23 @@ export function TopNav() {
       cancelled = true;
       clearInterval(id);
     };
+  }, []);
+
+  useEffect(() => {
+    const tick = () => {
+      const sec = Math.floor((Date.now() - bootRef.current) / 1000);
+      const m = Math.floor(sec / 60) % 60;
+      const s = sec % 60;
+      const h = Math.floor(sec / 3600);
+      setUptime(
+        h > 0
+          ? `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+          : `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`,
+      );
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
   }, []);
 
   const links: { href: string; label: string; num: string }[] = [
@@ -56,15 +80,20 @@ export function TopNav() {
       data-testid="top-nav"
       className="h-12 shrink-0 border-b border-border/70 bg-background/80 backdrop-blur-sm flex items-center px-5 gap-6"
     >
-      <Link href="/" className="flex items-baseline gap-1.5 group">
+      <Link href="/" className="flex items-center gap-2.5 group">
         <span
-          className="text-display text-2xl leading-none"
-          style={{ fontVariationSettings: '"opsz" 144, "SOFT" 100' }}
-        >
-          aios
+          aria-hidden
+          className="size-2 rounded-full bg-signal animate-signal shadow-[0_0_8px_currentColor] text-signal"
+        />
+        <span className="font-mono text-[13px] font-medium tracking-[-0.02em] text-foreground leading-none">
+          aios<span className="text-muted-foreground/50">.</span>console
         </span>
-        <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground translate-y-[-2px]">
-          /console
+        <span
+          aria-hidden
+          className="hidden md:inline-block h-3 w-px bg-border/60"
+        />
+        <span className="hidden md:inline-block font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground/60 tabular-nums leading-none">
+          up {uptime}
         </span>
       </Link>
 
@@ -111,31 +140,46 @@ function HealthIndicator({ health }: { health: HealthResp }) {
     ok: {
       text: "text-muted-foreground",
       dot: "bg-signal animate-signal",
-      label: "aios/live",
+      label: "online",
     },
     error: {
       text: "text-signal-alert",
       dot: "bg-signal-alert animate-signal",
-      label: "aios/offline",
+      label: "offline",
     },
   }[health.state];
+
+  // Right-edge readout: dot · status · vertical hairline · latency · /probe
+  // The latency cell stays present even while probing/offline so the column
+  // doesn't reflow on every tick; we just mute the value.
+  const latency =
+    health.state === "ok"
+      ? `${health.latencyMs}ms`
+      : health.state === "probing"
+        ? "—ms"
+        : "n/a";
+  const latencyClass =
+    health.state === "ok" ? "text-foreground/80" : "text-muted-foreground/40";
+
   return (
     <div
       data-testid="aios-health"
       data-state={health.state}
       className={cn(
-        "ml-auto flex items-center gap-2 font-mono text-[10px] tracking-wider uppercase",
+        "ml-auto flex items-center gap-2.5 font-mono text-[10px] tracking-[0.15em] uppercase tabular-nums",
         styles.text,
       )}
       title={health.state === "error" ? health.error : styles.label}
     >
-      <span
-        className={cn(
-          "size-1.5 rounded-full",
-          styles.dot,
-        )}
-      />
-      <span>{styles.label}</span>
+      <span className={cn("size-1.5 rounded-full", styles.dot)} />
+      <span>aios/{styles.label}</span>
+      <span className="h-3 w-px bg-border/60" />
+      <span className={cn("normal-case tracking-normal", latencyClass)}>
+        {latency}
+      </span>
+      <span className="text-muted-foreground/40 normal-case tracking-normal">
+        /probe
+      </span>
     </div>
   );
 }

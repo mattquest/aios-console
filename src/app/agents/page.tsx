@@ -30,21 +30,25 @@ export default function AgentsPage() {
 
   return (
     <main className="flex-1 min-w-0 overflow-y-auto">
-      <div className="max-w-5xl mx-auto px-8 py-10 space-y-6 animate-rise">
+      <div className="max-w-5xl mx-auto px-6 lg:px-8 py-10 space-y-6 animate-rise">
         <header className="flex items-end justify-between gap-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3 text-hairline text-muted-foreground">
-              <span className="tabular-nums text-signal">02</span>
-              <span className="h-px w-8 bg-border" />
-              <span>resource · agents</span>
+          <div className="space-y-3 min-w-0">
+            <div className="flex items-center gap-2 text-pico text-muted-foreground">
+              <span className="text-signal">//</span>
+              <span>resource/agents</span>
+              <span className="text-muted-foreground/40">·</span>
+              <span className="tabular-nums normal-case tracking-[0.12em]">
+                /02
+              </span>
             </div>
-            <h1
-              className="text-display text-5xl tracking-tight"
-              style={{ fontVariationSettings: '"opsz" 144, "SOFT" 100' }}
-            >
-              Agents
+            <h1 className="text-display text-[clamp(1.5rem,2.6vw,2rem)] leading-tight tracking-[-0.025em] text-foreground">
+              <span className="text-muted-foreground/50">›</span> agents
+              <span className="text-muted-foreground/40 font-normal">
+                {" "}
+                — model · prompt · tools
+              </span>
             </h1>
-            <p className="font-sans text-sm text-muted-foreground max-w-xl">
+            <p className="font-sans text-[13.5px] text-muted-foreground max-w-xl leading-[1.6]">
               A model binding, a system prompt, a set of tools. Every update
               creates an immutable version snapshot — sessions can pin to one,
               or float on latest.
@@ -90,13 +94,10 @@ function AgentRow({ agent, index }: { agent: Agent; index: number }) {
       <div className="grid grid-cols-12 gap-6 items-start">
         <div className="col-span-12 md:col-span-5 space-y-1">
           <div className="flex items-center gap-2">
-            <span className="font-mono text-[9px] text-muted-foreground/70 tabular-nums">
-              {String(index + 1).padStart(2, "0")}
+            <span className="font-mono text-[9px] text-muted-foreground/60 tabular-nums">
+              /{String(index + 1).padStart(2, "0")}
             </span>
-            <h3
-              className="text-display text-2xl tracking-tight"
-              style={{ fontVariationSettings: '"opsz" 36, "SOFT" 60' }}
-            >
+            <h3 className="font-mono text-[15px] tracking-[-0.01em] text-foreground">
               {agent.name}
             </h3>
           </div>
@@ -114,10 +115,7 @@ function AgentRow({ agent, index }: { agent: Agent; index: number }) {
 
         <div className="col-span-6 md:col-span-2 space-y-1 md:text-right">
           <div className="text-hairline text-muted-foreground">version</div>
-          <div
-            className="text-display text-3xl tabular-nums text-foreground"
-            style={{ fontVariationSettings: '"opsz" 48' }}
-          >
+          <div className="text-readout text-2xl tabular-nums text-foreground">
             v{agent.version}
           </div>
           {agent.triage && (
@@ -142,25 +140,40 @@ function AgentRow({ agent, index }: { agent: Agent; index: number }) {
 
 function EmptyAgents() {
   return (
-    <div className="border border-dashed border-border/60 rounded-sm px-8 py-16 text-center space-y-4">
-      <div
-        className="text-display text-4xl text-muted-foreground/60"
-        style={{ fontVariationSettings: '"opsz" 144, "SOFT" 100' }}
-      >
-        No agents yet
+    <div className="rounded-sm border border-border/60 bg-card/30 backdrop-blur-sm overflow-hidden max-w-2xl">
+      <div className="px-4 py-2 flex items-center justify-between border-b border-border/50 text-pico text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <span className="size-1.5 rounded-full bg-muted-foreground/40" />
+          <span>resource/agents</span>
+        </div>
+        <span className="normal-case tracking-[0.12em]">empty</span>
       </div>
-      <p className="font-sans text-sm text-muted-foreground max-w-md mx-auto">
-        Click <span className="text-foreground font-mono">+ new agent</span>{" "}
-        above. Any LiteLLM-compatible model URL works —{" "}
-        <span className="font-mono text-foreground/80">
-          anthropic/claude-sonnet-4-6
-        </span>
-        ,{" "}
-        <span className="font-mono text-foreground/80">
-          openai/gpt-5
-        </span>
-        , local Ollama / MLX, whatever.
-      </p>
+      <div className="px-4 py-5 space-y-3">
+        <div className="font-mono text-[12px] text-foreground/90 leading-relaxed">
+          <span className="text-signal">$</span>{" "}
+          <span className="text-muted-foreground">no agents registered.</span>
+        </div>
+        <p className="font-sans text-[13px] text-muted-foreground max-w-md leading-[1.6]">
+          Click{" "}
+          <span className="text-foreground font-mono">+ new agent</span> above.
+          Any LiteLLM-compatible model URL works.
+        </p>
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {[
+            "anthropic/claude-sonnet-4-6",
+            "openai/gpt-5",
+            "ollama/llama3.3",
+            "openrouter/moonshot-v1",
+          ].map((m) => (
+            <span
+              key={m}
+              className="font-mono text-[10px] px-2 py-1 rounded-sm border border-border/60 bg-background/50 text-foreground/80"
+            >
+              {m}
+            </span>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

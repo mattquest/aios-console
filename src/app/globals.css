@@ -9,9 +9,8 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
-  --font-serif: var(--font-fraunces);
-  --font-display: var(--font-fraunces);
-  --font-heading: var(--font-fraunces);
+  --font-display: var(--font-mono);
+  --font-heading: var(--font-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -146,22 +145,41 @@
     @apply font-sans;
   }
   .font-display {
-    font-family: var(--font-display), ui-serif, Georgia, serif;
-    font-feature-settings: "ss01", "ss02";
+    font-family: var(--font-mono), ui-monospace, "JetBrains Mono", monospace;
+    font-feature-settings: "ss01", "ss02", "zero", "cv11";
+    letter-spacing: -0.02em;
   }
 }
 
 @layer utilities {
+  /* Console display: tight mono used for headlines / wordmarks. */
   .text-display {
-    font-family: var(--font-display), ui-serif, Georgia, serif;
-    font-feature-settings: "ss01", "ss02";
-    letter-spacing: -0.03em;
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-feature-settings: "zero", "ss01", "cv11";
+    letter-spacing: -0.02em;
+    font-weight: 500;
+  }
+  /* Tabular readout: large mono numerals for telemetry. */
+  .text-readout {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-variant-numeric: tabular-nums slashed-zero;
+    font-feature-settings: "zero";
+    letter-spacing: -0.04em;
+    font-weight: 500;
   }
   .text-hairline {
     letter-spacing: 0.2em;
     text-transform: uppercase;
     font-size: 10px;
     font-family: var(--font-mono);
+  }
+  /* Even smaller — for telemetry caption labels. */
+  .text-pico {
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    font-size: 9px;
+    font-family: var(--font-mono);
+    line-height: 1;
   }
   .bracket-label::before {
     content: "[";
@@ -175,6 +193,16 @@
   }
   .crt-glow {
     text-shadow: 0 0 12px currentColor;
+  }
+  /* Faint horizontal scanline overlay — used very sparingly. */
+  .scanlines {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 2px,
+      rgb(255 255 255 / 0.025) 2px,
+      rgb(255 255 255 / 0.025) 3px
+    );
   }
   @keyframes signal-pulse {
     0%, 100% { opacity: 0.45; transform: scale(1); }
@@ -197,6 +225,15 @@
   .animate-marquee {
     animation: marquee 45s linear infinite;
   }
+  /* Used by the readout cards for a subtle scanning bar that sweeps once
+     on mount — emphasizes the "instrument calibrating" feel. */
+  @keyframes scan-bar {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(200%); }
+  }
+  .animate-scan {
+    animation: scan-bar 1.6s cubic-bezier(0.2, 0.8, 0.2, 1) 0.4s both;
+  }
   .divider-h {
     background-image: linear-gradient(
       to right,
@@ -211,5 +248,21 @@
     background-repeat: repeat-x;
     background-position: center;
     height: 1px;
+  }
+  /* Dotted vertical rule for status separators. */
+  .divider-v {
+    background-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent calc(50% - 1px),
+      var(--color-border) calc(50% - 1px),
+      var(--color-border) calc(50% + 1px),
+      transparent calc(50% + 1px),
+      transparent 100%
+    );
+    background-size: 1px 6px;
+    background-repeat: repeat-y;
+    background-position: center;
+    width: 1px;
   }
 }

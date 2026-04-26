@@ -30,15 +30,17 @@ export function Inspector({ events }: Props) {
       data-testid="inspector"
       className="w-[440px] shrink-0 border-l border-border/70 flex flex-col bg-muted/10"
     >
-      <div className="px-4 py-2.5 border-b border-border/60 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-hairline text-muted-foreground">
+      <div className="px-3 py-2 border-b border-border/60 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-pico text-muted-foreground">
+          <span className="size-1.5 rounded-full bg-signal-info animate-signal" />
           <span>inspector</span>
-          <span className="font-mono text-[10px] text-muted-foreground/60 tabular-nums">
-            {String(events.length).padStart(3, "0")}
+          <span className="text-muted-foreground/40">·</span>
+          <span className="text-foreground/80 tabular-nums normal-case tracking-[0.12em]">
+            n={String(events.length).padStart(3, "0")}
           </span>
         </div>
-        <span className="text-hairline text-muted-foreground/50">
-          event log / read-only
+        <span className="text-pico text-muted-foreground/50 normal-case tracking-[0.12em]">
+          read-only
         </span>
       </div>
       <Tabs defaultValue="events" className="flex flex-col flex-1 min-h-0">
