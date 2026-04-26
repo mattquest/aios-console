@@ -141,7 +141,7 @@ test("home renders session list and new-session dialog", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByTestId("session-list")).toBeVisible();
-  await expect(page.getByText("no sessions yet")).toBeVisible();
+  await expect(page.getByText(/no sessions/i)).toBeVisible();
 
   // New-session dialog opens with the fixture agent pre-selected.
   // The Select trigger reflects the chosen agent once the agent list loads.

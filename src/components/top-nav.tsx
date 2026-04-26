@@ -10,22 +10,8 @@ type HealthResp =
   | { state: "ok" }
   | { state: "error"; error: string };
 
-/**
- * Top nav with a live aios-connectivity dot.
- *
- * Pings ``/api/aios/v1/agents?limit=1`` every 10s as a cheap
- * round-trip probe — aios doesn't expose a dedicated /health route,
- * and this path succeeds on a fresh install (empty list) while still
- * exercising the bearer auth + DB pool. Shows the status in one
- * place so users don't have to guess "is aios running?" from a red
- * session list.
- */
 export function TopNav() {
   const pathname = usePathname();
-  // Start in "probing" so page navigation doesn't briefly flash a
-  // false red — the first response usually lands within ~200ms and
-  // flipping straight from amber to green is honest; flipping from
-  // red→green makes aios look flaky when it isn't.
   const [health, setHealth] = useState<HealthResp>({ state: "probing" });
 
   useEffect(() => {
@@ -54,39 +40,62 @@ export function TopNav() {
     };
   }, []);
 
-  const links: { href: string; label: string }[] = [
-    { href: "/", label: "sessions" },
-    { href: "/agents", label: "agents" },
-    { href: "/environments", label: "environments" },
+  const links: { href: string; label: string; num: string }[] = [
+    { href: "/", label: "sessions", num: "01" },
+    { href: "/agents", label: "agents", num: "02" },
+    { href: "/environments", label: "environments", num: "03" },
   ];
 
   const isActive = (href: string) =>
-    href === "/" ? pathname === "/" || pathname.startsWith("/sessions") : pathname.startsWith(href);
+    href === "/"
+      ? pathname === "/" || pathname.startsWith("/sessions")
+      : pathname.startsWith(href);
 
   return (
     <nav
       data-testid="top-nav"
-      className="h-9 shrink-0 border-b border-border flex items-center gap-4 px-3 font-mono text-[11px]"
+      className="h-12 shrink-0 border-b border-border/70 bg-background/80 backdrop-blur-sm flex items-center px-5 gap-6"
     >
-      <span className="font-semibold tracking-wider uppercase text-muted-foreground">
-        aios
-      </span>
-      <div className="flex items-center gap-3">
-        {links.map((l) => (
-          <Link
-            key={l.href}
-            href={l.href}
-            className={cn(
-              "px-2 py-1 rounded hover:bg-muted/40 transition-colors",
-              isActive(l.href)
-                ? "text-foreground bg-muted/50"
-                : "text-muted-foreground",
-            )}
-          >
-            {l.label}
-          </Link>
-        ))}
+      <Link href="/" className="flex items-baseline gap-1.5 group">
+        <span
+          className="text-display text-2xl leading-none"
+          style={{ fontVariationSettings: '"opsz" 144, "SOFT" 100' }}
+        >
+          aios
+        </span>
+        <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground translate-y-[-2px]">
+          /console
+        </span>
+      </Link>
+
+      <div className="h-5 w-px bg-border/50" />
+
+      <div className="flex items-center gap-0.5">
+        {links.map((l) => {
+          const active = isActive(l.href);
+          return (
+            <Link
+              key={l.href}
+              href={l.href}
+              className={cn(
+                "group relative flex items-baseline gap-1.5 px-3 py-1.5 rounded text-[11px] font-mono transition-colors",
+                active
+                  ? "text-foreground bg-muted/50"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/25",
+              )}
+            >
+              <span className="text-[9px] text-muted-foreground/60 tabular-nums">
+                {l.num}
+              </span>
+              <span>{l.label}</span>
+              {active && (
+                <span className="absolute left-3 right-3 -bottom-[13px] h-px bg-signal" />
+              )}
+            </Link>
+          );
+        })}
       </div>
+
       <HealthIndicator health={health} />
     </nav>
   );
@@ -96,29 +105,37 @@ function HealthIndicator({ health }: { health: HealthResp }) {
   const styles = {
     probing: {
       text: "text-muted-foreground",
-      dot: "bg-amber-500 animate-pulse",
-      label: "probing…",
+      dot: "bg-signal-warn animate-signal",
+      label: "probing",
     },
     ok: {
       text: "text-muted-foreground",
-      dot: "bg-emerald-500",
-      label: "aios connected",
+      dot: "bg-signal animate-signal",
+      label: "aios/live",
     },
     error: {
-      text: "text-destructive",
-      dot: "bg-destructive animate-pulse",
-      label: "aios unreachable",
+      text: "text-signal-alert",
+      dot: "bg-signal-alert animate-signal",
+      label: "aios/offline",
     },
   }[health.state];
   return (
     <div
       data-testid="aios-health"
       data-state={health.state}
-      className={cn("ml-auto flex items-center gap-1.5 text-[10px]", styles.text)}
+      className={cn(
+        "ml-auto flex items-center gap-2 font-mono text-[10px] tracking-wider uppercase",
+        styles.text,
+      )}
       title={health.state === "error" ? health.error : styles.label}
     >
-      <span className={cn("size-1.5 rounded-full", styles.dot)} />
-      {styles.label}
+      <span
+        className={cn(
+          "size-1.5 rounded-full",
+          styles.dot,
+        )}
+      />
+      <span>{styles.label}</span>
     </div>
   );
 }

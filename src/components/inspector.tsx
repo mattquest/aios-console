@@ -16,46 +16,49 @@ interface Props {
   events: AiosEvent[];
 }
 
+const TAB_DEFS = [
+  { value: "events", label: "events" },
+  { value: "spans", label: "spans" },
+  { value: "triage", label: "triage" },
+  { value: "payload", label: "payload" },
+] as const;
+
 export function Inspector({ events }: Props) {
   return (
     <aside
       data-testid="inspector"
-      className="w-[420px] shrink-0 border-l border-border flex flex-col h-full bg-muted/20"
+      className="w-[440px] shrink-0 border-l border-border/70 flex flex-col bg-muted/10"
     >
-      <Tabs defaultValue="events" className="flex flex-col h-full">
-        <TabsList className="rounded-none bg-transparent border-b border-border h-9 p-0 justify-start px-2">
-          <TabsTrigger
-            value="events"
-            className="font-mono text-[10px] uppercase tracking-wider data-[state=active]:bg-muted/50"
-          >
-            events ({events.length})
-          </TabsTrigger>
-          <TabsTrigger
-            value="spans"
-            className="font-mono text-[10px] uppercase tracking-wider data-[state=active]:bg-muted/50"
-          >
-            spans
-          </TabsTrigger>
-          <TabsTrigger
-            value="triage"
-            className="font-mono text-[10px] uppercase tracking-wider data-[state=active]:bg-muted/50"
-          >
-            triage
-          </TabsTrigger>
-          <TabsTrigger
-            value="payload"
-            className="font-mono text-[10px] uppercase tracking-wider data-[state=active]:bg-muted/50"
-          >
-            payload
-          </TabsTrigger>
+      <div className="px-4 py-2.5 border-b border-border/60 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-hairline text-muted-foreground">
+          <span>inspector</span>
+          <span className="font-mono text-[10px] text-muted-foreground/60 tabular-nums">
+            {String(events.length).padStart(3, "0")}
+          </span>
+        </div>
+        <span className="text-hairline text-muted-foreground/50">
+          event log / read-only
+        </span>
+      </div>
+      <Tabs defaultValue="events" className="flex flex-col flex-1 min-h-0">
+        <TabsList className="rounded-none bg-transparent border-b border-border/60 h-9 p-0 justify-start px-2 gap-0">
+          {TAB_DEFS.map((t) => (
+            <TabsTrigger
+              key={t.value}
+              value={t.value}
+              className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none px-3 relative rounded-none before:absolute before:inset-x-3 before:-bottom-px before:h-px before:bg-signal before:opacity-0 data-[state=active]:before:opacity-100 transition-colors"
+            >
+              {t.label}
+            </TabsTrigger>
+          ))}
         </TabsList>
         <TabsContent value="events" className="flex-1 overflow-hidden m-0">
           <EventsTab events={events} />
         </TabsContent>
-        <TabsContent value="spans" className="flex-1 overflow-y-auto m-0 p-3">
+        <TabsContent value="spans" className="flex-1 overflow-y-auto m-0 p-4">
           <SpansTab events={events} />
         </TabsContent>
-        <TabsContent value="triage" className="flex-1 overflow-y-auto m-0 p-3">
+        <TabsContent value="triage" className="flex-1 overflow-y-auto m-0 p-4">
           <TriageTab events={events} />
         </TabsContent>
         <TabsContent value="payload" className="flex-1 overflow-y-auto m-0">
@@ -69,10 +72,10 @@ export function Inspector({ events }: Props) {
 // ── events ────────────────────────────────────────────────────────────
 
 const KIND_COLORS: Record<EventKind, string> = {
-  message: "bg-blue-500/20 text-blue-300 border-blue-500/40",
-  lifecycle: "bg-violet-500/20 text-violet-300 border-violet-500/40",
-  span: "bg-zinc-500/20 text-zinc-300 border-zinc-500/40",
-  interrupt: "bg-destructive/20 text-destructive border-destructive/40",
+  message: "bg-signal-info/15 text-signal-info border-signal-info/40",
+  lifecycle: "bg-signal-system/15 text-signal-system border-signal-system/40",
+  span: "bg-muted/60 text-muted-foreground border-border",
+  interrupt: "bg-signal-alert/15 text-signal-alert border-signal-alert/40",
 };
 
 const EVENT_KINDS: readonly EventKind[] = [

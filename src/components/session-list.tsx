@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/client";
-import type { Session } from "@/lib/types";
-import { Badge } from "@/components/ui/badge";
+import type { Session, SessionStatus } from "@/lib/types";
 import { NewSessionDialog } from "@/components/new-session-dialog";
 import { cn, toErrorMessage } from "@/lib/utils";
 
@@ -43,47 +42,63 @@ export function SessionList({ activeId }: Props) {
   return (
     <aside
       data-testid="session-list"
-      className="w-64 shrink-0 border-r border-border flex flex-col h-full"
+      className="w-[260px] shrink-0 border-r border-border/70 flex flex-col bg-sidebar/40"
     >
-      <header className="px-3 py-3 border-b border-border flex items-center justify-between">
-        <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-          sessions
+      <header className="px-4 py-3 flex items-center justify-between border-b border-border/60">
+        <div className="flex items-center gap-2">
+          <span className="text-hairline text-muted-foreground">sessions</span>
+          {sessions.length > 0 && (
+            <span className="font-mono text-[10px] text-muted-foreground/60 tabular-nums">
+              {String(sessions.length).padStart(2, "0")}
+            </span>
+          )}
         </div>
         <NewSessionDialog />
       </header>
       <div className="flex-1 overflow-y-auto">
-        {loading && (
-          <div className="px-3 py-4 text-xs text-muted-foreground font-mono">
-            loading…
-          </div>
-        )}
+        {loading && <RowPlaceholder text="loading" />}
         {error && (
-          <div className="px-3 py-4 text-xs text-destructive font-mono">
+          <div className="px-4 py-3 font-mono text-[10px] text-signal-alert break-all">
+            <span className="bracket-label">fault</span>
             {error}
           </div>
         )}
         {!loading && !error && sessions.length === 0 && (
-          <div className="px-3 py-4 text-xs text-muted-foreground font-mono">
-            no sessions yet
+          <div className="px-4 py-6 space-y-2">
+            <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              <span className="bracket-label">empty</span>no sessions
+            </p>
+            <p className="font-sans text-[11px] text-muted-foreground/70 leading-relaxed">
+              Create your first one with{" "}
+              <span className="text-foreground">+ new</span> above.
+            </p>
           </div>
         )}
         <ul>
-          {sessions.map((s) => (
+          {sessions.map((s, i) => (
             <li key={s.id}>
               <Link
                 href={`/sessions/${s.id}`}
                 className={cn(
-                  "block px-3 py-2 border-b border-border/50 hover:bg-muted/40 transition-colors",
-                  activeId === s.id && "bg-muted/60",
+                  "group relative block px-4 py-2.5 border-b border-border/30 transition-colors",
+                  activeId === s.id
+                    ? "bg-muted/60"
+                    : "hover:bg-muted/30",
                 )}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="font-mono text-[11px] truncate text-foreground/90">
-                    {s.title || s.id}
-                  </div>
+                {activeId === s.id && (
+                  <span className="absolute left-0 top-2 bottom-2 w-0.5 bg-signal" />
+                )}
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[9px] text-muted-foreground/60 tabular-nums shrink-0">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span className="font-mono text-[11px] truncate text-foreground/90 flex-1">
+                    {s.title || s.id.slice(0, 16) + "…"}
+                  </span>
                   <StatusDot status={s.status} />
                 </div>
-                <div className="font-mono text-[10px] text-muted-foreground truncate mt-0.5">
+                <div className="font-mono text-[9px] text-muted-foreground/60 truncate mt-1 pl-6">
                   {s.id}
                 </div>
               </Link>
@@ -95,22 +110,31 @@ export function SessionList({ activeId }: Props) {
   );
 }
 
-function StatusDot({ status }: { status: Session["status"] }) {
-  const color =
-    status === "running"
-      ? "bg-emerald-500"
-      : status === "waiting" || status === "rescheduling"
-        ? "bg-amber-500"
-        : status === "archived"
-          ? "bg-zinc-600"
-          : "bg-zinc-400";
+function RowPlaceholder({ text }: { text: string }) {
   return (
-    <Badge
-      variant="outline"
-      className="gap-1.5 px-1.5 py-0 font-mono text-[9px] uppercase"
-    >
-      <span className={cn("size-1.5 rounded-full", color)} />
-      {status}
-    </Badge>
+    <div className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/60">
+      <span className="bracket-label">{text}</span>…
+    </div>
+  );
+}
+
+const STATUS_COLOR: Record<SessionStatus, string> = {
+  idle: "bg-muted-foreground/40",
+  running: "bg-signal",
+  waiting: "bg-signal-warn",
+  rescheduling: "bg-signal-warn",
+  archived: "bg-muted-foreground/20",
+};
+
+function StatusDot({ status }: { status: SessionStatus }) {
+  return (
+    <span
+      className={cn(
+        "size-1.5 rounded-full shrink-0",
+        STATUS_COLOR[status] ?? "bg-muted-foreground/40",
+        status === "running" && "animate-signal",
+      )}
+      title={status}
+    />
   );
 }

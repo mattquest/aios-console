@@ -2,13 +2,12 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import type { AiosEvent, ToolCall } from "@/lib/types";
-import { Badge } from "@/components/ui/badge";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ChevronRight, Wrench } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -17,18 +16,6 @@ interface Props {
   connected: boolean;
 }
 
-/**
- * Rendered conversation view. Two render slots stack:
- *
- *   1. Persisted message events from the log (user, assistant, tool).
- *   2. A transient "streaming assistant" slot fed by SSE deltas — shown
- *      only when ``streamingContent`` is non-empty AND the tail of the
- *      log isn't already an assistant message. This mirrors how Claude
- *      managed agents surfaces in-progress output without double-rendering.
- *
- * Non-message events (lifecycle, span, triage decisions) live in the
- * inspector pane — the chat view deliberately stays clean.
- */
 export function Chat({ events, streamingContent, connected }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const messageEvents = useMemo(
@@ -37,11 +24,10 @@ export function Chat({ events, streamingContent, connected }: Props) {
   );
 
   useEffect(() => {
-    // Stick to bottom on new content — standard chat UX. If the user
-    // scrolls up, respect it by only auto-scrolling when already near
-    // the bottom.
     const el = scrollRef.current;
     if (!el) return;
+    // Only auto-stick when the user's already near the bottom — scrolling
+    // up to read history shouldn't be hijacked.
     const nearBottom = el.scrollHeight - el.clientHeight - el.scrollTop < 120;
     if (nearBottom) el.scrollTop = el.scrollHeight;
   }, [messageEvents.length, streamingContent]);
@@ -58,19 +44,51 @@ export function Chat({ events, streamingContent, connected }: Props) {
     <div
       ref={scrollRef}
       data-testid="chat-messages"
-      className="flex-1 overflow-y-auto px-4 py-6 space-y-4"
+      className="flex-1 overflow-y-auto"
     >
-      {messageEvents.length === 0 && !showStreaming && (
-        <div className="font-mono text-xs text-muted-foreground text-center py-8">
-          no messages yet — send something below
-        </div>
-      )}
-      {messageEvents.map((e) => (
-        <MessageRow key={e.id} event={e} />
-      ))}
-      {showStreaming && (
-        <StreamingAssistant content={streamingContent} connected={connected} />
-      )}
+      <div className="max-w-3xl mx-auto px-8 py-10 space-y-8">
+        {messageEvents.length === 0 && !showStreaming && <ChatEmptyState />}
+        {messageEvents.map((e) => (
+          <MessageRow key={e.id} event={e} />
+        ))}
+        {showStreaming && (
+          <StreamingAssistant content={streamingContent} connected={connected} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ChatEmptyState() {
+  return (
+    <div className="pt-16 text-center space-y-3">
+      <div
+        className="text-display text-5xl text-muted-foreground/50 italic"
+        style={{ fontVariationSettings: '"opsz" 144, "SOFT" 100' }}
+      >
+        Say something.
+      </div>
+      <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/50">
+        <span className="bracket-label">stdin</span>waiting for first user message
+      </div>
+    </div>
+  );
+}
+
+const ROLE_LABEL: Record<string, string> = {
+  user: "human",
+  assistant: "model",
+  system: "system",
+  tool: "tool",
+};
+
+function RoleGutter({ role, seq }: { role: string; seq: number }) {
+  return (
+    <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground/80 pt-1 flex items-baseline gap-2">
+      <span>{ROLE_LABEL[role] ?? role}</span>
+      <span className="text-muted-foreground/40 tabular-nums">
+        #{String(seq).padStart(3, "0")}
+      </span>
     </div>
   );
 }
@@ -85,29 +103,28 @@ function MessageRow({ event }: { event: AiosEvent }) {
   };
   const role = data.role ?? "?";
 
-  if (role === "tool") {
-    return <ToolResultRow event={event} />;
-  }
+  if (role === "tool") return <ToolResultRow event={event} />;
 
   const toolCalls = data.tool_calls ?? [];
+  const isAssistant = role === "assistant";
 
   return (
     <div
       data-testid={`message-${role}`}
       data-seq={event.seq}
-      className={cn(
-        "grid grid-cols-[60px_1fr] gap-3",
-        role === "user" && "text-foreground",
-        role === "assistant" && "text-foreground",
-        role === "system" && "text-muted-foreground",
-      )}
+      className="grid grid-cols-[72px_1fr] gap-4"
     >
-      <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground pt-1">
-        {role} <span className="text-muted-foreground/60">#{event.seq}</span>
-      </div>
-      <div className="space-y-2 min-w-0">
+      <RoleGutter role={role} seq={event.seq} />
+      <div className="space-y-3 min-w-0">
         {data.content && (
-          <div className="whitespace-pre-wrap text-sm leading-relaxed">
+          <div
+            className={cn(
+              "leading-relaxed whitespace-pre-wrap",
+              isAssistant
+                ? "font-sans text-[15px] text-foreground"
+                : "font-sans text-[14px] text-foreground/90",
+            )}
+          >
             {data.content}
           </div>
         )}
@@ -129,20 +146,20 @@ function StreamingAssistant({
   return (
     <div
       data-testid="message-streaming"
-      className="grid grid-cols-[60px_1fr] gap-3 text-foreground"
+      className="grid grid-cols-[72px_1fr] gap-4"
     >
-      <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground pt-1 flex items-center gap-1">
-        asst
+      <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground pt-1 flex items-baseline gap-2">
+        <span>model</span>
         <span
           className={cn(
             "size-1.5 rounded-full",
-            connected ? "bg-emerald-500 animate-pulse" : "bg-amber-500",
+            connected ? "bg-signal animate-signal" : "bg-signal-warn",
           )}
         />
       </div>
-      <div className="whitespace-pre-wrap text-sm leading-relaxed">
+      <div className="font-sans text-[15px] leading-relaxed whitespace-pre-wrap text-foreground">
         {content}
-        <span className="inline-block w-[7px] h-[1em] bg-foreground/60 ml-0.5 align-text-bottom animate-pulse" />
+        <span className="inline-block w-[6px] h-[1em] bg-signal/80 ml-1 align-text-bottom animate-signal" />
       </div>
     </div>
   );
@@ -157,20 +174,21 @@ function ToolCallCard({ call }: { call: ToolCall }) {
   }
   return (
     <Collapsible>
-      <div className="rounded-md border border-border bg-card/40">
-        <CollapsibleTrigger className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted/30 transition-colors group">
+      <div className="rounded-sm border border-border/60 bg-card/40 backdrop-blur-sm">
+        <CollapsibleTrigger className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-muted/30 transition-colors group">
           <ChevronRight className="size-3 transition-transform group-data-[state=open]:rotate-90 text-muted-foreground" />
-          <Wrench className="size-3 text-muted-foreground" />
-          <span className="font-mono text-xs">{call.function.name}</span>
-          <Badge
-            variant="outline"
-            className="ml-auto font-mono text-[9px] uppercase"
-          >
-            {call.id.slice(0, 10)}
-          </Badge>
+          <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-signal">
+            invoke
+          </span>
+          <span className="font-mono text-[11px] text-foreground">
+            {call.function.name}
+          </span>
+          <span className="ml-auto font-mono text-[9px] uppercase tracking-wider text-muted-foreground/60">
+            {call.id.slice(0, 12)}
+          </span>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <pre className="px-3 pb-2 pt-0 text-[11px] font-mono overflow-x-auto whitespace-pre-wrap text-muted-foreground">
+          <pre className="px-3 pb-2 pt-1 text-[11px] font-mono overflow-x-auto whitespace-pre-wrap text-muted-foreground/90 border-t border-border/40">
             {JSON.stringify(parsed, null, 2)}
           </pre>
         </CollapsibleContent>
@@ -200,34 +218,34 @@ function ToolResultRow({ event }: { event: AiosEvent }) {
       <div
         data-testid="message-tool"
         data-seq={event.seq}
-        className="grid grid-cols-[60px_1fr] gap-3"
+        className="grid grid-cols-[72px_1fr] gap-4"
       >
-        <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground pt-1">
-          tool <span className="text-muted-foreground/60">#{event.seq}</span>
-        </div>
+        <RoleGutter role="tool" seq={event.seq} />
         <div
           className={cn(
-            "rounded-md border bg-card/40",
-            data.is_error ? "border-destructive/50" : "border-border",
+            "rounded-sm border bg-card/40 backdrop-blur-sm",
+            data.is_error ? "border-signal-alert/50" : "border-border/60",
           )}
         >
-          <CollapsibleTrigger className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted/30 transition-colors group">
+          <CollapsibleTrigger className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-muted/30 transition-colors group">
             <ChevronRight className="size-3 transition-transform group-data-[state=open]:rotate-90 text-muted-foreground" />
-            <span className="font-mono text-xs">
-              {data.name ?? "result"}
-              {data.is_error && (
-                <span className="ml-2 text-destructive">error</span>
+            <span
+              className={cn(
+                "font-mono text-[9px] uppercase tracking-[0.18em]",
+                data.is_error ? "text-signal-alert" : "text-signal",
               )}
-            </span>
-            <Badge
-              variant="outline"
-              className="ml-auto font-mono text-[9px] uppercase"
             >
-              {data.tool_call_id?.slice(0, 10) ?? "?"}
-            </Badge>
+              {data.is_error ? "error" : "result"}
+            </span>
+            <span className="font-mono text-[11px] text-foreground">
+              {data.name ?? "tool"}
+            </span>
+            <span className="ml-auto font-mono text-[9px] uppercase tracking-wider text-muted-foreground/60">
+              {data.tool_call_id?.slice(0, 12) ?? "?"}
+            </span>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <pre className="px-3 pb-2 pt-0 text-[11px] font-mono overflow-x-auto whitespace-pre-wrap text-muted-foreground">
+            <pre className="px-3 pb-2 pt-1 text-[11px] font-mono overflow-x-auto whitespace-pre-wrap text-muted-foreground/90 border-t border-border/40">
               {preview}
             </pre>
           </CollapsibleContent>
