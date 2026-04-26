@@ -35,6 +35,11 @@ export interface Agent {
   triage?: { model: string; system: string } | null;
 }
 
+export interface Environment {
+  id: string;
+  name: string;
+}
+
 export type EventKind = "message" | "lifecycle" | "span" | "interrupt";
 
 export interface AiosEvent {

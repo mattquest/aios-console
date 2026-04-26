@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
-import type { Agent } from "@/lib/types";
+import type { Agent, Environment } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,6 +25,11 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Plus } from "lucide-react";
 
+function agentLabel(agents: Agent[], id: string): string | null {
+  const a = agents.find((x) => x.id === id);
+  return a ? `${a.name} · ${a.model}` : null;
+}
+
 /**
  * Create a new session. Requires at least one agent to exist — the dialog
  * surfaces an actionable empty state rather than a silent failure when
@@ -34,29 +39,37 @@ export function NewSessionDialog() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [environments, setEnvironments] = useState<Environment[]>([]);
   const [agentId, setAgentId] = useState<string>("");
+  const [environmentId, setEnvironmentId] = useState<string>("");
   const [initialMessage, setInitialMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
-    api
-      .listAgents()
-      .then((r) => {
-        setAgents(r.data);
-        if (r.data.length && !agentId) setAgentId(r.data[0].id);
+    // Fetch agents + environments in parallel — a session create needs
+    // both, and showing the dialog with only one loaded feels laggy.
+    Promise.all([api.listAgents(), api.listEnvironments()])
+      .then(([agentsResp, envResp]) => {
+        setAgents(agentsResp.data);
+        setEnvironments(envResp.data);
+        if (agentsResp.data.length && !agentId)
+          setAgentId(agentsResp.data[0].id);
+        if (envResp.data.length && !environmentId)
+          setEnvironmentId(envResp.data[0].id);
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
-  }, [open, agentId]);
+  }, [open, agentId, environmentId]);
 
   const create = async () => {
-    if (!agentId) return;
+    if (!agentId || !environmentId) return;
     setSubmitting(true);
     setError(null);
     try {
       const s = await api.createSession(
         agentId,
+        environmentId,
         initialMessage.trim() || undefined,
       );
       setOpen(false);
@@ -106,13 +119,53 @@ export function NewSessionDialog() {
             ) : (
               <Select value={agentId} onValueChange={(v) => setAgentId(v ?? "")}>
                 <SelectTrigger id="agent" className="font-mono text-xs">
-                  <SelectValue />
+                  {/* base-ui's SelectValue falls back to the raw value when it can't
+                      find a rendered item to mirror — with UUIDs that's unreadable.
+                      Derive the label client-side from the loaded agent list. */}
+                  <SelectValue>
+                    {agentLabel(agents, agentId) ?? "select agent…"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {agents.map((a) => (
                     <SelectItem key={a.id} value={a.id} className="font-mono text-xs">
-                      {a.name} ·{" "}
-                      <span className="text-muted-foreground">{a.model}</span>
+                      {`${a.name} · ${a.model}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+          <div className="grid gap-2">
+            <Label
+              htmlFor="environment"
+              className="font-mono text-xs uppercase"
+            >
+              environment
+            </Label>
+            {environments.length === 0 ? (
+              <div className="text-xs text-muted-foreground font-mono">
+                no environments found — create one via POST /v1/environments
+              </div>
+            ) : (
+              <Select
+                value={environmentId}
+                onValueChange={(v) => setEnvironmentId(v ?? "")}
+              >
+                <SelectTrigger id="environment" className="font-mono text-xs">
+                  <SelectValue>
+                    {environments.find((e) => e.id === environmentId)?.name ??
+                      "select environment…"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {environments.map((e) => (
+                    <SelectItem
+                      key={e.id}
+                      value={e.id}
+                      className="font-mono text-xs"
+                    >
+                      {e.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -153,7 +206,7 @@ export function NewSessionDialog() {
           <Button
             size="sm"
             onClick={create}
-            disabled={!agentId || submitting}
+            disabled={!agentId || !environmentId || submitting}
             data-testid="create-session-submit"
           >
             {submitting ? "creating…" : "create"}

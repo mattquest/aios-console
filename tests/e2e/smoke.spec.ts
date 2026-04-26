@@ -9,6 +9,7 @@ import { test, expect, Page, Route } from "@playwright/test";
  */
 
 const AGENT_ID = "agent_01TEST";
+const ENV_ID = "env_01TEST";
 const SESSION_ID = "sess_01ABCDEF";
 
 type Fixture = {
@@ -27,8 +28,11 @@ function buildSse(events: Array<{ event: string; data: unknown }>): string {
 }
 
 async function installMocks(page: Page, fx: Fixture) {
-  await page.route("**/api/aios/v1/agents*", (route: Route) =>
-    route.fulfill({
+  await page.route("**/api/aios/v1/agents*", (route: Route) => {
+    // The TopNav health probe also hits this endpoint. Same fixture
+    // body is fine for both — a valid empty-ish list still passes the
+    // r.ok check that drives the green/red dot.
+    return route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
         data: [
@@ -42,6 +46,17 @@ async function installMocks(page: Page, fx: Fixture) {
             triage: null,
           },
         ],
+        has_more: false,
+        next_after: null,
+      }),
+    });
+  });
+
+  await page.route("**/api/aios/v1/environments*", (route: Route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [{ id: ENV_ID, name: "default" }],
         has_more: false,
         next_after: null,
       }),

@@ -30,7 +30,10 @@ export default defineConfig({
     reuseExistingServer: false,
     timeout: 60_000,
     env: {
-      AIOS_URL: "http://127.0.0.1:9",
+      // Deliberately unreachable but NOT a "bad port" (fetch blocks
+      // 1..21, 1080 etc.). 49152 is a valid ephemeral port that
+      // nobody'll be listening on in a test run.
+      AIOS_URL: "http://127.0.0.1:49152",
       AIOS_API_KEY: "test-key",
     },
   },

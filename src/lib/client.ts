@@ -7,6 +7,7 @@
 import type {
   Agent,
   AiosEvent,
+  Environment,
   ListResponse,
   Session,
 } from "@/lib/types";
@@ -35,17 +36,35 @@ export const api = {
   postMessage: (id: string, content: string) =>
     json(`/v1/sessions/${id}/messages`, {
       method: "POST",
-      body: JSON.stringify({ role: "user", content }),
+      // SessionUserMessage is extra="forbid" and wants only {content, metadata} —
+      // sending a role field (chat-completions habit) gets rejected with 422.
+      body: JSON.stringify({ content }),
     }),
-  createSession: (agent_id: string, initial_message?: string): Promise<Session> =>
+  createSession: (
+    agent_id: string,
+    environment_id: string,
+    initial_message?: string,
+  ): Promise<Session> =>
     json(`/v1/sessions`, {
       method: "POST",
       body: JSON.stringify({
         agent_id,
+        environment_id,
         ...(initial_message ? { initial_message } : {}),
       }),
     }),
   interrupt: (id: string): Promise<void> =>
     json(`/v1/sessions/${id}/interrupt`, { method: "POST" }),
   listAgents: (): Promise<ListResponse<Agent>> => json(`/v1/agents?limit=50`),
+  createAgent: (body: {
+    name: string;
+    model: string;
+    system: string;
+    tools: { type: string }[];
+  }): Promise<Agent> =>
+    json(`/v1/agents`, { method: "POST", body: JSON.stringify(body) }),
+  listEnvironments: (): Promise<ListResponse<Environment>> =>
+    json(`/v1/environments?limit=50`),
+  createEnvironment: (body: { name: string }): Promise<Environment> =>
+    json(`/v1/environments`, { method: "POST", body: JSON.stringify(body) }),
 };
