@@ -37,9 +37,7 @@ export function NewAgentDialog({ onCreated }: { onCreated?: () => void }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [model, setModel] = useState(
-    "openai/mlx-community/Qwen3.6-35B-A3B-4bit-DWQ",
-  );
+  const [model, setModel] = useState("");
   const [system, setSystem] = useState("You are a helpful assistant.");
   const [tools, setTools] = useState<Set<string>>(new Set(DEFAULT_TOOLS));
   const [submitting, setSubmitting] = useState(false);
@@ -122,7 +120,7 @@ export function NewAgentDialog({ onCreated }: { onCreated?: () => void }) {
               id="agent-model"
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              placeholder="openai/... · anthropic/... · openrouter/..."
+              placeholder="anthropic/claude-sonnet-4-6 · openrouter/… · openai/…"
               className="font-mono text-xs"
               data-testid="agent-model-input"
             />
