@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/collapsible";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useInFlightSpan } from "@/hooks/use-inflight-span";
 
 interface Props {
   events: AiosEvent[];
@@ -22,6 +23,7 @@ export function Chat({ events, streamingContent, connected }: Props) {
     () => events.filter((e) => e.kind === "message"),
     [events],
   );
+  const inFlight = useInFlightSpan(events);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -30,7 +32,7 @@ export function Chat({ events, streamingContent, connected }: Props) {
     // up to read history shouldn't be hijacked.
     const nearBottom = el.scrollHeight - el.clientHeight - el.scrollTop < 120;
     if (nearBottom) el.scrollTop = el.scrollHeight;
-  }, [messageEvents.length, streamingContent]);
+  }, [messageEvents.length, streamingContent, inFlight?.elapsedMs]);
 
   const lastMessage = messageEvents.at(-1);
   const showStreaming =
@@ -39,23 +41,84 @@ export function Chat({ events, streamingContent, connected }: Props) {
       lastMessage &&
       (lastMessage.data as { role?: string }).role === "assistant"
     );
+  // Show a silent-generation badge only when the provider isn't streaming
+  // deltas but a model_request_start span is still open. Prevents the UI
+  // from pretending nothing's happening during long local-model calls.
+  const showGenerating = inFlight && !showStreaming;
 
   return (
     <div
       ref={scrollRef}
       data-testid="chat-messages"
-      className="flex-1 overflow-y-auto"
+      className="flex-1 overflow-y-auto overflow-x-hidden"
     >
       <div className="max-w-3xl mx-auto px-8 py-10 space-y-8">
-        {messageEvents.length === 0 && !showStreaming && <ChatEmptyState />}
+        {messageEvents.length === 0 && !showStreaming && !showGenerating && (
+          <ChatEmptyState />
+        )}
         {messageEvents.map((e) => (
           <MessageRow key={e.id} event={e} />
         ))}
         {showStreaming && (
           <StreamingAssistant content={streamingContent} connected={connected} />
         )}
+        {showGenerating && inFlight && <GeneratingIndicator inFlight={inFlight} />}
       </div>
     </div>
+  );
+}
+
+function GeneratingIndicator({
+  inFlight,
+}: {
+  inFlight: { name: string; elapsedMs: number };
+}) {
+  const seconds = (inFlight.elapsedMs / 1000).toFixed(1);
+  const concern =
+    inFlight.elapsedMs > 30_000
+      ? "elevated"
+      : inFlight.elapsedMs > 90_000
+        ? "prolonged"
+        : null;
+  return (
+    <div
+      data-testid="generating-indicator"
+      className="grid grid-cols-[72px_1fr] gap-4 animate-rise"
+    >
+      <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground pt-1 flex items-baseline gap-2">
+        <span>model</span>
+        <span className="size-1.5 rounded-full bg-signal-warn animate-signal" />
+      </div>
+      <div className="flex items-baseline gap-3 font-mono text-[11px] text-muted-foreground">
+        <span className="text-signal-warn uppercase tracking-[0.18em]">
+          generating
+        </span>
+        <GeneratingBars />
+        <span className="tabular-nums text-foreground">{seconds}s</span>
+        {concern && (
+          <span className="text-signal-warn uppercase tracking-[0.18em]">
+            · {concern}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function GeneratingBars() {
+  return (
+    <span className="inline-flex items-end gap-0.5 h-3">
+      {[0, 1, 2, 3].map((i) => (
+        <span
+          key={i}
+          className="w-[2px] bg-signal-warn/70 origin-bottom animate-signal"
+          style={{
+            animationDelay: `${i * 120}ms`,
+            height: `${40 + i * 15}%`,
+          }}
+        />
+      ))}
+    </span>
   );
 }
 

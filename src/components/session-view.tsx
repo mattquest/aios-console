@@ -89,25 +89,29 @@ function SessionHeader({
       data-testid="session-header"
       className="shrink-0 border-b border-border/70 bg-background/60 backdrop-blur-sm"
     >
-      <div className="px-5 py-3 flex items-center gap-6">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-hairline text-muted-foreground">session</span>
+      <div className="px-5 py-3 flex items-center gap-4">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <span className="text-hairline text-muted-foreground shrink-0">
+            session
+          </span>
           <span className="font-mono text-[11px] text-foreground/90 truncate">
             {session?.id ?? "…"}
           </span>
         </div>
 
-        <div className="h-4 w-px bg-border/60" />
+        <div className="h-4 w-px bg-border/60 shrink-0" />
 
-        <StatusPill status={session?.status} />
+        <div className="shrink-0">
+          <StatusPill status={session?.status} />
+        </div>
 
         {session?.agent_version != null && (
-          <span className="font-mono text-[10px] text-muted-foreground border border-border/60 rounded-sm px-1.5 py-0.5 tracking-wider uppercase">
+          <span className="font-mono text-[10px] text-muted-foreground border border-border/60 rounded-sm px-1.5 py-0.5 tracking-wider uppercase shrink-0">
             v{session.agent_version}
           </span>
         )}
 
-        <div className="ml-auto flex items-center gap-5">
+        <div className="flex items-center gap-5 shrink-0">
           <Stat label="events" value={stats.events} />
           <Stat label="spans" value={stats.spans} />
           <Stat label="tools" value={stats.tools} />
