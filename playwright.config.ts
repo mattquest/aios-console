@@ -24,11 +24,16 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
   ],
+  // ``next start`` rather than ``next dev`` because Next's dev server has
+  // a single-instance lock — if the developer is already running
+  // ``pnpm dev`` on 3000, a second ``next dev`` refuses to start and
+  // playwright just sees ERR_CONNECTION_REFUSED. ``next start`` has no
+  // such lock and matches the production runtime we actually ship.
   webServer: {
-    command: "pnpm dev --port 3100",
+    command: "pnpm build && pnpm start --port 3100",
     port: 3100,
     reuseExistingServer: false,
-    timeout: 60_000,
+    timeout: 180_000,
     env: {
       // Deliberately unreachable but NOT a "bad port" (fetch blocks
       // 1..21, 1080 etc.). 49152 is a valid ephemeral port that
