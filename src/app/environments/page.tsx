@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/client";
 import type { Environment } from "@/lib/types";
+import { toErrorMessage } from "@/lib/utils";
 import { NewEnvironmentDialog } from "@/components/new-environment-dialog";
 
 export default function EnvironmentsPage() {
@@ -17,7 +18,7 @@ export default function EnvironmentsPage() {
       const r = await api.listEnvironments();
       setEnvironments(r.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(toErrorMessage(e));
     } finally {
       setLoading(false);
     }

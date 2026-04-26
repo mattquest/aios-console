@@ -4,17 +4,16 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
 import type { Agent, Environment } from "@/lib/types";
+import { toErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -23,6 +22,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { FormField } from "@/components/form-field";
+import { DialogFormFooter } from "@/components/dialog-form-footer";
 import { Plus } from "lucide-react";
 
 function agentLabel(agents: Agent[], id: string): string | null {
@@ -30,11 +31,6 @@ function agentLabel(agents: Agent[], id: string): string | null {
   return a ? `${a.name} · ${a.model}` : null;
 }
 
-/**
- * Create a new session. Requires at least one agent to exist — the dialog
- * surfaces an actionable empty state rather than a silent failure when
- * no agents are configured in the backend.
- */
 export function NewSessionDialog() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -48,19 +44,15 @@ export function NewSessionDialog() {
 
   useEffect(() => {
     if (!open) return;
-    // Fetch agents + environments in parallel — a session create needs
-    // both, and showing the dialog with only one loaded feels laggy.
     Promise.all([api.listAgents(), api.listEnvironments()])
       .then(([agentsResp, envResp]) => {
         setAgents(agentsResp.data);
         setEnvironments(envResp.data);
-        if (agentsResp.data.length && !agentId)
-          setAgentId(agentsResp.data[0].id);
-        if (envResp.data.length && !environmentId)
-          setEnvironmentId(envResp.data[0].id);
+        setAgentId((prev) => prev || agentsResp.data[0]?.id || "");
+        setEnvironmentId((prev) => prev || envResp.data[0]?.id || "");
       })
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
-  }, [open, agentId, environmentId]);
+      .catch((e) => setError(toErrorMessage(e)));
+  }, [open]);
 
   const create = async () => {
     if (!agentId || !environmentId) return;
@@ -77,7 +69,7 @@ export function NewSessionDialog() {
       router.push(`/sessions/${s.id}`);
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(toErrorMessage(e));
     } finally {
       setSubmitting(false);
     }
@@ -108,23 +100,20 @@ export function NewSessionDialog() {
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2">
-          <div className="grid gap-2">
-            <Label htmlFor="agent" className="font-mono text-xs uppercase">
-              agent
-            </Label>
+          <FormField id="agent" label="agent">
             {agents.length === 0 ? (
               <div className="text-xs text-muted-foreground font-mono">
                 no agents found — create one via POST /v1/agents first
               </div>
             ) : (
               <Select value={agentId} onValueChange={(v) => setAgentId(v ?? "")}>
+                {/* base-ui's SelectValue falls back to the raw value when it
+                    can't find a rendered item to mirror — with UUIDs that's
+                    unreadable. Derive the label client-side instead. */}
                 <SelectTrigger
                   id="agent"
                   className="w-full font-mono text-xs [&>span]:truncate"
                 >
-                  {/* base-ui's SelectValue falls back to the raw value when it can't
-                      find a rendered item to mirror — with UUIDs that's unreadable.
-                      Derive the label client-side from the loaded agent list. */}
                   <SelectValue>
                     {agentLabel(agents, agentId) ?? "select agent…"}
                   </SelectValue>
@@ -138,14 +127,8 @@ export function NewSessionDialog() {
                 </SelectContent>
               </Select>
             )}
-          </div>
-          <div className="grid gap-2">
-            <Label
-              htmlFor="environment"
-              className="font-mono text-xs uppercase"
-            >
-              environment
-            </Label>
+          </FormField>
+          <FormField id="environment" label="environment">
             {environments.length === 0 ? (
               <div className="text-xs text-muted-foreground font-mono">
                 no environments found — create one via POST /v1/environments
@@ -177,14 +160,8 @@ export function NewSessionDialog() {
                 </SelectContent>
               </Select>
             )}
-          </div>
-          <div className="grid gap-2">
-            <Label
-              htmlFor="initial-message"
-              className="font-mono text-xs uppercase"
-            >
-              initial message
-            </Label>
+          </FormField>
+          <FormField id="initial-message" label="initial message">
             <Textarea
               id="initial-message"
               value={initialMessage}
@@ -193,31 +170,20 @@ export function NewSessionDialog() {
               rows={3}
               className="font-mono text-xs resize-none"
             />
-          </div>
+          </FormField>
           {error && (
             <div className="text-xs text-destructive font-mono break-all">
               {error}
             </div>
           )}
         </div>
-        <DialogFooter>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setOpen(false)}
-            disabled={submitting}
-          >
-            cancel
-          </Button>
-          <Button
-            size="sm"
-            onClick={create}
-            disabled={!agentId || !environmentId || submitting}
-            data-testid="create-session-submit"
-          >
-            {submitting ? "creating…" : "create"}
-          </Button>
-        </DialogFooter>
+        <DialogFormFooter
+          submitting={submitting}
+          submitDisabled={!agentId || !environmentId}
+          onCancel={() => setOpen(false)}
+          onSubmit={create}
+          submitTestId="create-session-submit"
+        />
       </DialogContent>
     </Dialog>
   );

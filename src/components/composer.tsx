@@ -4,19 +4,15 @@ import { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/client";
+import { toErrorMessage } from "@/lib/utils";
+import type { SessionStatus } from "@/lib/types";
 import { Send, Square } from "lucide-react";
 
 interface Props {
   sessionId: string;
-  status: string;
+  status: SessionStatus | "unknown";
 }
 
-/**
- * Message composer + interrupt control. Enter submits, Shift+Enter
- * inserts a newline — matching Claude's conversation UX. The interrupt
- * button replaces the send button whenever the session is running so
- * devs can kill a turn without pulling out curl.
- */
 export function Composer({ sessionId, status }: Props) {
   const [value, setValue] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -33,7 +29,7 @@ export function Composer({ sessionId, status }: Props) {
       await api.postMessage(sessionId, content);
       setValue("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(toErrorMessage(e));
     } finally {
       setSubmitting(false);
     }
@@ -43,7 +39,7 @@ export function Composer({ sessionId, status }: Props) {
     try {
       await api.interrupt(sessionId);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(toErrorMessage(e));
     }
   };
 

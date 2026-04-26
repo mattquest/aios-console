@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/client";
 import type { Agent } from "@/lib/types";
+import { toErrorMessage } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { NewAgentDialog } from "@/components/new-agent-dialog";
 
@@ -18,7 +19,7 @@ export default function AgentsPage() {
       const r = await api.listAgents();
       setAgents(r.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(toErrorMessage(e));
     } finally {
       setLoading(false);
     }

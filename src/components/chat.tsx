@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { AiosEvent, ToolCall } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -31,7 +31,10 @@ interface Props {
  */
 export function Chat({ events, streamingContent, connected }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const messageEvents = events.filter((e) => e.kind === "message");
+  const messageEvents = useMemo(
+    () => events.filter((e) => e.kind === "message"),
+    [events],
+  );
 
   useEffect(() => {
     // Stick to bottom on new content — standard chat UX. If the user

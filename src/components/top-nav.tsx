@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { cn } from "@/lib/utils";
+import { cn, toErrorMessage } from "@/lib/utils";
 
 type HealthResp =
   | { state: "probing" }
@@ -43,12 +43,7 @@ export function TopNav() {
           );
         }
       } catch (e) {
-        if (!cancelled) {
-          setHealth({
-            state: "error",
-            error: e instanceof Error ? e.message : String(e),
-          });
-        }
+        if (!cancelled) setHealth({ state: "error", error: toErrorMessage(e) });
       }
     };
     probe();

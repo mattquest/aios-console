@@ -14,28 +14,24 @@ interface Props {
   sessionId: string;
 }
 
-/**
- * Top-level session view. Two live data sources:
- *
- *   1. SSE stream — events + deltas. Drives the chat and inspector in
- *      real time. Reconnects automatically via EventSource.
- *   2. Session polling — status, stop_reason, title. Cheap, every 2s,
- *      because SSE only carries events, not the session row itself.
- */
 export function SessionView({ sessionId }: Props) {
   const stream = useSessionStream(sessionId);
   const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    const load = () =>
-      api
-        .getSession(sessionId)
-        .then((s) => !cancelled && setSession(s))
-        .catch(() => {
-          /* surface in inspector stream error banner instead */
-        });
-    load();
+    const load = async () => {
+      try {
+        const next = await api.getSession(sessionId);
+        if (cancelled) return;
+        // Keep the same reference when nothing the UI cares about changed —
+        // prevents a render cascade through Chat/Inspector every poll tick.
+        setSession((prev) => (sessionEqual(prev, next) ? prev : next));
+      } catch {
+        /* surfaced via stream error banner */
+      }
+    };
+    void load();
     const id = setInterval(load, 2000);
     return () => {
       cancelled = true;
@@ -61,6 +57,18 @@ export function SessionView({ sessionId }: Props) {
         <Inspector events={stream.events} />
       </div>
     </div>
+  );
+}
+
+function sessionEqual(a: Session | null, b: Session): boolean {
+  if (!a) return false;
+  return (
+    a.id === b.id &&
+    a.status === b.status &&
+    a.agent_version === b.agent_version &&
+    a.title === b.title &&
+    a.focal_channel === b.focal_channel &&
+    a.updated_at === b.updated_at
   );
 }
 

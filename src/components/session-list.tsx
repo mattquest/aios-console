@@ -5,20 +5,13 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/client";
 import type { Session } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { NewSessionDialog } from "@/components/new-session-dialog";
-import { cn } from "@/lib/utils";
+import { cn, toErrorMessage } from "@/lib/utils";
 
 interface Props {
   activeId?: string;
 }
 
-/**
- * Left-rail session list. Polls every 5s so newly-created sessions from
- * other tabs / curl appear without a refresh. Cheaper than SSE here — the
- * list endpoint is fast and we don't need sub-second freshness for dead
- * conversations.
- */
 export function SessionList({ activeId }: Props) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,12 +27,12 @@ export function SessionList({ activeId }: Props) {
           setError(null);
         }
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+        if (!cancelled) setError(toErrorMessage(e));
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
-    load();
+    void load();
     const id = setInterval(load, 5000);
     return () => {
       cancelled = true;
@@ -120,8 +113,4 @@ function StatusDot({ status }: { status: Session["status"] }) {
       {status}
     </Badge>
   );
-}
-
-export function SessionListPlaceholder() {
-  return <Button variant="ghost" size="sm" disabled>loading</Button>;
 }

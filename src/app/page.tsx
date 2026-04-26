@@ -1,11 +1,6 @@
 import Link from "next/link";
 import { SessionList } from "@/components/session-list";
 
-/**
- * Landing view. Left rail lists sessions; the main pane surfaces the
- * setup path for first-time users — the common "how do I get started"
- * question is answered inline instead of buried in a README.
- */
 export default function Home() {
   return (
     <>

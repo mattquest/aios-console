@@ -87,10 +87,7 @@ export function useSessionStream(sessionId: string): StreamState {
 
   useEffect(() => {
     dispatch({ type: "reset" });
-    // Pointing at the proxy keeps the bearer token server-side; the
-    // proxy pipes bytes through without buffering (see the route handler).
-    const url = `/api/aios/sessions/${sessionId}/stream`;
-    const es = new EventSource(url);
+    const es = new EventSource(`/api/aios/sessions/${sessionId}/stream`);
 
     es.addEventListener("open", () => dispatch({ type: "open" }));
 

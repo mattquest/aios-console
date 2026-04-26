@@ -3,19 +3,20 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
+import { toErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { FormField } from "@/components/form-field";
+import { DialogFormFooter } from "@/components/dialog-form-footer";
 import { Plus } from "lucide-react";
 
 const BUILTIN_TOOLS = [
@@ -32,13 +33,6 @@ const BUILTIN_TOOLS = [
 
 const DEFAULT_TOOLS: ReadonlySet<string> = new Set(["search_events"]);
 
-/**
- * Create an agent without curl. Covers the fields a typical user sets up
- * front: name, LiteLLM model string, system prompt, tool checkboxes.
- * Advanced knobs (skills, mcp_servers, triage, window min/max) stay in
- * the API for now — adding them here would crowd the dialog and users
- * rarely need them on first setup.
- */
 export function NewAgentDialog({ onCreated }: { onCreated?: () => void }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -82,7 +76,7 @@ export function NewAgentDialog({ onCreated }: { onCreated?: () => void }) {
       onCreated?.();
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(toErrorMessage(e));
     } finally {
       setSubmitting(false);
     }
@@ -113,7 +107,7 @@ export function NewAgentDialog({ onCreated }: { onCreated?: () => void }) {
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2">
-          <Field id="agent-name" label="name">
+          <FormField id="agent-name" label="name">
             <Input
               id="agent-name"
               value={name}
@@ -122,8 +116,8 @@ export function NewAgentDialog({ onCreated }: { onCreated?: () => void }) {
               className="font-mono text-xs"
               data-testid="agent-name-input"
             />
-          </Field>
-          <Field id="agent-model" label="model (LiteLLM URL)">
+          </FormField>
+          <FormField id="agent-model" label="model (LiteLLM URL)">
             <Input
               id="agent-model"
               value={model}
@@ -132,8 +126,8 @@ export function NewAgentDialog({ onCreated }: { onCreated?: () => void }) {
               className="font-mono text-xs"
               data-testid="agent-model-input"
             />
-          </Field>
-          <Field id="agent-system" label="system prompt">
+          </FormField>
+          <FormField id="agent-system" label="system prompt">
             <Textarea
               id="agent-system"
               value={system}
@@ -141,8 +135,8 @@ export function NewAgentDialog({ onCreated }: { onCreated?: () => void }) {
               rows={4}
               className="font-mono text-xs resize-none"
             />
-          </Field>
-          <Field id="agent-tools" label="tools">
+          </FormField>
+          <FormField id="agent-tools" label="tools">
             <div className="grid grid-cols-3 gap-1.5 text-[11px] font-mono">
               {BUILTIN_TOOLS.map((t) => (
                 <label
@@ -165,51 +159,21 @@ export function NewAgentDialog({ onCreated }: { onCreated?: () => void }) {
               <code>AIOS_TAVILY_API_KEY</code>; search_events works
               unconditionally.
             </div>
-          </Field>
+          </FormField>
           {error && (
             <div className="text-xs text-destructive font-mono break-all">
               {error}
             </div>
           )}
         </div>
-        <DialogFooter>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setOpen(false)}
-            disabled={submitting}
-          >
-            cancel
-          </Button>
-          <Button
-            size="sm"
-            onClick={create}
-            disabled={!name.trim() || !model.trim() || submitting}
-            data-testid="create-agent-submit"
-          >
-            {submitting ? "creating…" : "create"}
-          </Button>
-        </DialogFooter>
+        <DialogFormFooter
+          submitting={submitting}
+          submitDisabled={!name.trim() || !model.trim()}
+          onCancel={() => setOpen(false)}
+          onSubmit={create}
+          submitTestId="create-agent-submit"
+        />
       </DialogContent>
     </Dialog>
-  );
-}
-
-function Field({
-  id,
-  label,
-  children,
-}: {
-  id: string;
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="grid gap-1.5">
-      <Label htmlFor={id} className="font-mono text-xs uppercase">
-        {label}
-      </Label>
-      {children}
-    </div>
   );
 }

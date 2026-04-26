@@ -3,26 +3,21 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
+import { toErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormField } from "@/components/form-field";
+import { DialogFormFooter } from "@/components/dialog-form-footer";
 import { Plus } from "lucide-react";
 
-/**
- * Create an environment. The aios environment resource holds sandbox
- * container config (pre-installed packages, network policies) — devs
- * on first setup just need a named default, so the dialog only surfaces
- * ``name``. Everything else can be added via the API when needed.
- */
 export function NewEnvironmentDialog({ onCreated }: { onCreated?: () => void }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -41,7 +36,7 @@ export function NewEnvironmentDialog({ onCreated }: { onCreated?: () => void }) 
       onCreated?.();
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(toErrorMessage(e));
     } finally {
       setSubmitting(false);
     }
@@ -71,10 +66,7 @@ export function NewEnvironmentDialog({ onCreated }: { onCreated?: () => void }) 
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2">
-          <div className="grid gap-1.5">
-            <Label htmlFor="env-name" className="font-mono text-xs uppercase">
-              name
-            </Label>
+          <FormField id="env-name" label="name">
             <Input
               id="env-name"
               value={name}
@@ -82,31 +74,20 @@ export function NewEnvironmentDialog({ onCreated }: { onCreated?: () => void }) 
               className="font-mono text-xs"
               data-testid="environment-name-input"
             />
-          </div>
+          </FormField>
           {error && (
             <div className="text-xs text-destructive font-mono break-all">
               {error}
             </div>
           )}
         </div>
-        <DialogFooter>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setOpen(false)}
-            disabled={submitting}
-          >
-            cancel
-          </Button>
-          <Button
-            size="sm"
-            onClick={create}
-            disabled={!name.trim() || submitting}
-            data-testid="create-environment-submit"
-          >
-            {submitting ? "creating…" : "create"}
-          </Button>
-        </DialogFooter>
+        <DialogFormFooter
+          submitting={submitting}
+          submitDisabled={!name.trim()}
+          onCancel={() => setOpen(false)}
+          onSubmit={create}
+          submitTestId="create-environment-submit"
+        />
       </DialogContent>
     </Dialog>
   );

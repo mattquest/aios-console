@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { AiosEvent } from "@/lib/types";
+import type { AiosEvent, EventKind } from "@/lib/types";
 import {
   Tabs,
   TabsContent,
@@ -16,17 +16,6 @@ interface Props {
   events: AiosEvent[];
 }
 
-/**
- * Dev-inspector rail. Four tabs, each a thin read of the event log:
- *
- *   events    — raw firehose, filterable by kind and substring
- *   spans     — model + tool span pairs with inferred duration
- *   triage    — triage_decision lifecycle events with reason strings
- *   payload   — reconstructed LiteLLM request (most-recent model_request_start)
- *
- * The chat pane intentionally hides everything except ``message`` events;
- * this rail is where the full log, decisions, and debugging data live.
- */
 export function Inspector({ events }: Props) {
   return (
     <aside
@@ -79,17 +68,24 @@ export function Inspector({ events }: Props) {
 
 // ── events ────────────────────────────────────────────────────────────
 
-const KIND_COLORS: Record<string, string> = {
+const KIND_COLORS: Record<EventKind, string> = {
   message: "bg-blue-500/20 text-blue-300 border-blue-500/40",
   lifecycle: "bg-violet-500/20 text-violet-300 border-violet-500/40",
   span: "bg-zinc-500/20 text-zinc-300 border-zinc-500/40",
   interrupt: "bg-destructive/20 text-destructive border-destructive/40",
 };
 
+const EVENT_KINDS: readonly EventKind[] = [
+  "message",
+  "lifecycle",
+  "span",
+  "interrupt",
+];
+
 function EventsTab({ events }: { events: AiosEvent[] }) {
   const [filter, setFilter] = useState("");
-  const [activeKinds, setActiveKinds] = useState<Set<string>>(
-    new Set(["message", "lifecycle", "span", "interrupt"]),
+  const [activeKinds, setActiveKinds] = useState<Set<EventKind>>(
+    () => new Set(EVENT_KINDS),
   );
 
   const filtered = useMemo(() => {
@@ -101,7 +97,7 @@ function EventsTab({ events }: { events: AiosEvent[] }) {
     });
   }, [events, filter, activeKinds]);
 
-  const toggle = (k: string) =>
+  const toggle = (k: EventKind) =>
     setActiveKinds((s) => {
       const n = new Set(s);
       if (n.has(k)) n.delete(k);
@@ -120,7 +116,7 @@ function EventsTab({ events }: { events: AiosEvent[] }) {
           className="h-7 text-xs font-mono"
         />
         <div className="flex gap-1 flex-wrap">
-          {(["message", "lifecycle", "span", "interrupt"] as const).map((k) => (
+          {EVENT_KINDS.map((k) => (
             <button
               key={k}
               onClick={() => toggle(k)}
@@ -306,10 +302,14 @@ function SpanUsage({
 // ── triage ────────────────────────────────────────────────────────────
 
 function TriageTab({ events }: { events: AiosEvent[] }) {
-  const decisions = events.filter(
-    (e) =>
-      e.kind === "lifecycle" &&
-      (e.data as { event?: string }).event === "triage_decision",
+  const decisions = useMemo(
+    () =>
+      events.filter(
+        (e) =>
+          e.kind === "lifecycle" &&
+          (e.data as { event?: string }).event === "triage_decision",
+      ),
+    [events],
   );
 
   if (decisions.length === 0) {
