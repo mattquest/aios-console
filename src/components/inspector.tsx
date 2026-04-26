@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { AiosEvent, EventKind } from "@/lib/types";
 import {
   Tabs,
@@ -11,6 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 
 interface Props {
   events: AiosEvent[];
@@ -55,13 +56,13 @@ export function Inspector({ events }: Props) {
         <TabsContent value="events" className="flex-1 overflow-hidden m-0">
           <EventsTab events={events} />
         </TabsContent>
-        <TabsContent value="spans" className="flex-1 overflow-y-auto m-0 p-4">
+        <TabsContent value="spans" className="flex-1 overflow-hidden m-0">
           <SpansTab events={events} />
         </TabsContent>
-        <TabsContent value="triage" className="flex-1 overflow-y-auto m-0 p-4">
+        <TabsContent value="triage" className="flex-1 overflow-hidden m-0">
           <TriageTab events={events} />
         </TabsContent>
-        <TabsContent value="payload" className="flex-1 overflow-y-auto m-0">
+        <TabsContent value="payload" className="flex-1 overflow-hidden m-0">
           <PayloadTab events={events} />
         </TabsContent>
       </Tabs>
@@ -134,16 +135,24 @@ function EventsTab({ events }: { events: AiosEvent[] }) {
           ))}
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto">
-        {filtered.map((e) => (
-          <EventRow key={e.id} event={e} />
-        ))}
-        {filtered.length === 0 && (
-          <div className="p-3 text-xs text-muted-foreground font-mono">
-            (no events match)
-          </div>
-        )}
-      </div>
+      <EventRowsScroller events={filtered} />
+    </div>
+  );
+}
+
+function EventRowsScroller({ events }: { events: AiosEvent[] }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useStickToBottom(ref, events.length);
+  return (
+    <div ref={ref} className="flex-1 overflow-y-auto">
+      {events.map((e) => (
+        <EventRow key={e.id} event={e} />
+      ))}
+      {events.length === 0 && (
+        <div className="p-3 text-xs text-muted-foreground font-mono">
+          (no events match)
+        </div>
+      )}
     </div>
   );
 }
@@ -246,36 +255,44 @@ function SpansTab({ events }: { events: AiosEvent[] }) {
     return pairs;
   }, [events]);
 
-  if (spans.length === 0) {
-    return (
-      <div className="text-xs text-muted-foreground font-mono">
-        (no spans yet)
-      </div>
-    );
-  }
+  const ref = useRef<HTMLDivElement>(null);
+  useStickToBottom(ref, spans.length);
 
   return (
-    <div className="space-y-2">
-      {spans.map((s) => (
-        <div
-          key={s.start.id}
-          className="border border-border rounded-md p-2 bg-card/30 font-mono text-[10px]"
-        >
-          <div className="flex items-center justify-between">
-            <span>{s.name}</span>
-            <span className="text-muted-foreground">
-              {s.duration_ms !== undefined
-                ? `${s.duration_ms}ms`
-                : "in flight…"}
-            </span>
-          </div>
-          {s.end && (
-            <SpanUsage
-              data={s.end.data as { model_usage?: Record<string, number>; is_error?: boolean }}
-            />
-          )}
+    <div ref={ref} className="h-full overflow-y-auto p-4">
+      {spans.length === 0 ? (
+        <div className="text-xs text-muted-foreground font-mono">
+          (no spans yet)
         </div>
-      ))}
+      ) : (
+        <div className="space-y-2">
+          {spans.map((s) => (
+            <div
+              key={s.start.id}
+              className="border border-border rounded-md p-2 bg-card/30 font-mono text-[10px]"
+            >
+              <div className="flex items-center justify-between">
+                <span>{s.name}</span>
+                <span className="text-muted-foreground">
+                  {s.duration_ms !== undefined
+                    ? `${s.duration_ms}ms`
+                    : "in flight…"}
+                </span>
+              </div>
+              {s.end && (
+                <SpanUsage
+                  data={
+                    s.end.data as {
+                      model_usage?: Record<string, number>;
+                      is_error?: boolean;
+                    }
+                  }
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -315,56 +332,61 @@ function TriageTab({ events }: { events: AiosEvent[] }) {
     [events],
   );
 
-  if (decisions.length === 0) {
-    return (
-      <div className="text-xs text-muted-foreground font-mono space-y-2">
-        <div>(no triage decisions)</div>
-        <div className="text-muted-foreground/60">
-          configure an agent with a ``triage`` block to see per-message gate
-          verdicts here
-        </div>
-      </div>
-    );
-  }
+  const ref = useRef<HTMLDivElement>(null);
+  useStickToBottom(ref, decisions.length);
 
   return (
-    <div className="space-y-2">
-      {decisions.map((e) => {
-        const d = e.data as {
-          decision?: string;
-          reason?: string;
-          reacting_to?: number;
-        };
-        const admit = d.decision === "respond";
-        return (
-          <div
-            key={e.id}
-            data-testid={`triage-${e.seq}`}
-            className={cn(
-              "border rounded-md p-2 font-mono text-[10px]",
-              admit
-                ? "border-emerald-500/40 bg-emerald-500/5"
-                : "border-amber-500/40 bg-amber-500/5",
-            )}
-          >
-            <div className="flex items-center justify-between">
-              <Badge
-                variant="outline"
+    <div ref={ref} className="h-full overflow-y-auto p-4">
+      {decisions.length === 0 ? (
+        <div className="text-xs text-muted-foreground font-mono space-y-2">
+          <div>(no triage decisions)</div>
+          <div className="text-muted-foreground/60">
+            configure an agent with a ``triage`` block to see per-message gate
+            verdicts here
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {decisions.map((e) => {
+            const d = e.data as {
+              decision?: string;
+              reason?: string;
+              reacting_to?: number;
+            };
+            const admit = d.decision === "respond";
+            return (
+              <div
+                key={e.id}
+                data-testid={`triage-${e.seq}`}
                 className={cn(
-                  "px-1 py-0 text-[9px] uppercase",
-                  admit ? "text-emerald-300" : "text-amber-300",
+                  "border rounded-md p-2 font-mono text-[10px]",
+                  admit
+                    ? "border-emerald-500/40 bg-emerald-500/5"
+                    : "border-amber-500/40 bg-amber-500/5",
                 )}
               >
-                {d.decision ?? "?"}
-              </Badge>
-              <span className="text-muted-foreground">
-                seq={e.seq} · reacting_to={d.reacting_to ?? "?"}
-              </span>
-            </div>
-            <div className="mt-1 text-foreground/80">{d.reason || "(no reason)"}</div>
-          </div>
-        );
-      })}
+                <div className="flex items-center justify-between">
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "px-1 py-0 text-[9px] uppercase",
+                      admit ? "text-emerald-300" : "text-amber-300",
+                    )}
+                  >
+                    {d.decision ?? "?"}
+                  </Badge>
+                  <span className="text-muted-foreground">
+                    seq={e.seq} · reacting_to={d.reacting_to ?? "?"}
+                  </span>
+                </div>
+                <div className="mt-1 text-foreground/80">
+                  {d.reason || "(no reason)"}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -395,17 +417,23 @@ function PayloadTab({ events }: { events: AiosEvent[] }) {
     return upTo.map((e) => e.data);
   }, [events]);
 
-  if (!payload) {
-    return (
-      <div className="p-3 text-xs text-muted-foreground font-mono">
-        (no model call yet)
-      </div>
-    );
-  }
+  const ref = useRef<HTMLDivElement>(null);
+  // Payload tab re-latches to the bottom when the reconstructed message
+  // list grows — i.e. when a fresh model_request_start lands and the
+  // upstream conversation window shifts.
+  useStickToBottom(ref, payload?.length ?? 0);
 
   return (
-    <pre className="p-3 text-[10px] font-mono overflow-x-auto whitespace-pre-wrap">
-      {JSON.stringify(payload, null, 2)}
-    </pre>
+    <div ref={ref} className="h-full overflow-y-auto">
+      {!payload ? (
+        <div className="p-3 text-xs text-muted-foreground font-mono">
+          (no model call yet)
+        </div>
+      ) : (
+        <pre className="p-3 text-[10px] font-mono overflow-x-auto whitespace-pre-wrap">
+          {JSON.stringify(payload, null, 2)}
+        </pre>
+      )}
+    </div>
   );
 }

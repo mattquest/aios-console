@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import type { AiosEvent, ToolCall } from "@/lib/types";
 import {
   Collapsible,
@@ -10,6 +10,7 @@ import {
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useInFlightSpan } from "@/hooks/use-inflight-span";
+import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 
 interface Props {
   events: AiosEvent[];
@@ -25,14 +26,13 @@ export function Chat({ events, streamingContent, connected }: Props) {
   );
   const inFlight = useInFlightSpan(events);
 
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    // Only auto-stick when the user's already near the bottom — scrolling
-    // up to read history shouldn't be hijacked.
-    const nearBottom = el.scrollHeight - el.clientHeight - el.scrollTop < 120;
-    if (nearBottom) el.scrollTop = el.scrollHeight;
-  }, [messageEvents.length, streamingContent, inFlight?.elapsedMs]);
+  // Stick the chat to the bottom on new content (tokens, new messages, the
+  // generating-indicator elapsed tick) — but only if the user is already
+  // near the bottom, so scrolling up to read earlier context is respected.
+  useStickToBottom(
+    scrollRef,
+    `${messageEvents.length}·${streamingContent.length}·${inFlight?.elapsedMs ?? 0}`,
+  );
 
   const lastMessage = messageEvents.at(-1);
   const showStreaming =
