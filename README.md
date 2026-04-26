@@ -1,4 +1,4 @@
-# aios-web
+# aios-console
 
 Dev console for [aios](https://github.com/eumemic/aios) — a chat UI that exposes the session event log, span timings, triage decisions, and context payloads as first-class inspector panels.
 
