@@ -110,10 +110,7 @@ export function NewSessionDialog() {
                 {/* base-ui's SelectValue falls back to the raw value when it
                     can't find a rendered item to mirror — with UUIDs that's
                     unreadable. Derive the label client-side instead. */}
-                <SelectTrigger
-                  id="agent"
-                  className="w-full font-mono text-xs [&>span]:truncate"
-                >
+                <SelectTrigger id="agent" className="w-full font-mono text-xs">
                   <SelectValue>
                     {agentLabel(agents, agentId) ?? "select agent…"}
                   </SelectValue>
@@ -140,7 +137,7 @@ export function NewSessionDialog() {
               >
                 <SelectTrigger
                   id="environment"
-                  className="w-full font-mono text-xs [&>span]:truncate"
+                  className="w-full font-mono text-xs"
                 >
                   <SelectValue>
                     {environments.find((e) => e.id === environmentId)?.name ??
