@@ -56,7 +56,13 @@ function findInFlightStart(events: AiosEvent[]): AiosEvent | null {
   for (const e of events) {
     if (e.kind !== "span") continue;
     const d = e.data as { event?: string };
-    if (!d.event?.endsWith("_start")) continue;
+    // Only consider *_request_start spans (matches the docstring intent).
+    // Bare `_start` matches sweep_start / step_start / context_build_start too,
+    // whose `_end` events carry their own *_start_id field (sweep_start_id,
+    // step_start_id, ...), which the endedIds loop above doesn't track —
+    // so those start events stay "in-flight" forever, leaving the
+    // post-turn sweep's step_start permanently lit up as "generating".
+    if (!d.event?.endsWith("_request_start")) continue;
     if (endedIds.has(e.id)) continue;
     if (!latest || e.seq > latest.seq) latest = e;
   }
