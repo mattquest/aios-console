@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/client";
-import type { Session, SessionStatus } from "@/lib/types";
+import { deriveDisplayStatus, type DisplayStatus, type Session } from "@/lib/types";
 import { NewSessionDialog } from "@/components/new-session-dialog";
 import { cn, toErrorMessage } from "@/lib/utils";
 
@@ -96,7 +96,7 @@ export function SessionList({ activeId }: Props) {
                   <span className="font-mono text-[11px] truncate text-foreground/90 flex-1">
                     {s.title || s.id.slice(0, 16) + "…"}
                   </span>
-                  <StatusDot status={s.status} />
+                  <StatusDot session={s} />
                 </div>
                 <div className="font-mono text-[9px] text-muted-foreground/60 truncate mt-1 pl-6">
                   {s.id}
@@ -118,21 +118,22 @@ function RowPlaceholder({ text }: { text: string }) {
   );
 }
 
-const STATUS_COLOR: Record<SessionStatus, string> = {
+const STATUS_COLOR: Record<DisplayStatus, string> = {
   idle: "bg-muted-foreground/40",
-  running: "bg-signal",
-  waiting: "bg-signal-warn",
-  rescheduling: "bg-signal-warn",
-  archived: "bg-muted-foreground/20",
+  active: "bg-signal",
+  "needs you": "bg-signal-warn",
+  retrying: "bg-signal-warn",
+  errored: "bg-signal-alert",
 };
 
-function StatusDot({ status }: { status: SessionStatus }) {
+function StatusDot({ session }: { session: Session }) {
+  const status = deriveDisplayStatus(session);
   return (
     <span
       className={cn(
         "size-1.5 rounded-full shrink-0",
         STATUS_COLOR[status] ?? "bg-muted-foreground/40",
-        status === "running" && "animate-signal",
+        status === "active" && "animate-signal",
       )}
       title={status}
     />

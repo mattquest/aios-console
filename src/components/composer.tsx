@@ -18,7 +18,10 @@ export function Composer({ sessionId, status }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const running = status === "running" || status === "waiting";
+  // {active, idle} mirrors the backend's derived status. The composer is
+  // ALWAYS sendable — aios's headline property is that the model stays
+  // responsive while tools run; interrupt appears alongside, not instead.
+  const running = status === "active";
 
   const send = async () => {
     const content = value.trim();
@@ -90,18 +93,19 @@ export function Composer({ sessionId, status }: Props) {
                 {String(chars).padStart(3, "0")} ch
               </span>
             </div>
-            {running ? (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={interrupt}
-                className="h-7 font-mono text-[10px] uppercase tracking-wider border-signal-alert/50 text-signal-alert hover:bg-signal-alert/10"
-                data-testid="interrupt-button"
-              >
-                <Square className="size-3" />
-                interrupt
-              </Button>
-            ) : (
+            <div className="flex items-center gap-2">
+              {running && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={interrupt}
+                  className="h-7 font-mono text-[10px] uppercase tracking-wider border-signal-alert/50 text-signal-alert hover:bg-signal-alert/10"
+                  data-testid="interrupt-button"
+                >
+                  <Square className="size-3" />
+                  interrupt
+                </Button>
+              )}
               <Button
                 size="sm"
                 onClick={send}
@@ -112,7 +116,7 @@ export function Composer({ sessionId, status }: Props) {
                 <Send className="size-3" />
                 {submitting ? "sending" : "send ⏎"}
               </Button>
-            )}
+            </div>
           </div>
         </div>
       </div>
