@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/client";
 import type { Agent } from "@/lib/types";
 import { toErrorMessage } from "@/lib/utils";
-import { NewAgentDialog } from "@/components/new-agent-dialog";
+import { AgentDialog } from "@/components/agent-dialog";
+import { Button } from "@/components/ui/button";
+import { Trash2 } from "lucide-react";
 
 export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -54,7 +56,7 @@ export default function AgentsPage() {
               or float on latest.
             </p>
           </div>
-          <NewAgentDialog onCreated={reload} />
+          <AgentDialog mode="create" onSaved={reload} />
         </header>
 
         <div className="divider-h" />
@@ -75,7 +77,12 @@ export default function AgentsPage() {
         {!loading && !error && agents.length > 0 && (
           <div className="space-y-3" data-testid="agents-list">
             {agents.map((a, i) => (
-              <AgentRow key={a.id} agent={a} index={i} />
+              <AgentRow
+                key={a.id}
+                agent={a}
+                index={i}
+                onChanged={reload}
+              />
             ))}
           </div>
         )}
@@ -84,7 +91,33 @@ export default function AgentsPage() {
   );
 }
 
-function AgentRow({ agent, index }: { agent: Agent; index: number }) {
+function AgentRow({
+  agent,
+  index,
+  onChanged,
+}: {
+  agent: Agent;
+  index: number;
+  onChanged: () => void;
+}) {
+  const [deleting, setDeleting] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const doDelete = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await api.deleteAgent(agent.id);
+      onChanged();
+    } catch (e) {
+      setDeleteError(toErrorMessage(e));
+      setConfirming(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div
       className="group border border-border/60 rounded-sm bg-card/30 hover:bg-card/60 hover:border-signal/40 transition-colors p-5"
@@ -133,6 +166,55 @@ function AgentRow({ agent, index }: { agent: Agent; index: number }) {
             {agent.system}
           </p>
         </>
+      )}
+
+      <div className="divider-h my-4" />
+      <div className="flex items-center justify-end gap-1">
+        <AgentDialog mode="edit" agent={agent} onSaved={onChanged} />
+        {confirming ? (
+          <div className="flex items-center gap-1.5 font-mono text-[10px]">
+            <span className="text-muted-foreground uppercase">
+              delete · sessions on v{agent.version} keep working
+            </span>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={deleting}
+              onClick={() => setConfirming(false)}
+              className="h-7 font-mono text-[10px] uppercase"
+              data-testid={`cancel-delete-${agent.id}`}
+            >
+              cancel
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={deleting}
+              onClick={doDelete}
+              className="h-7 font-mono text-[10px] uppercase"
+              data-testid={`confirm-delete-${agent.id}`}
+            >
+              {deleting ? "…" : "confirm"}
+            </Button>
+          </div>
+        ) : (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setConfirming(true)}
+            className="h-7 font-mono text-[10px] uppercase text-muted-foreground hover:text-destructive"
+            data-testid={`delete-agent-${agent.id}`}
+            aria-label={`Delete agent ${agent.name}`}
+          >
+            <Trash2 className="size-3" />
+            delete
+          </Button>
+        )}
+      </div>
+      {deleteError && (
+        <div className="mt-2 text-[11px] font-mono text-destructive break-all">
+          {deleteError}
+        </div>
       )}
     </div>
   );
