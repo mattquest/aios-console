@@ -61,7 +61,9 @@ pnpm build        # production bundle
 pnpm start        # production server
 ```
 
-On Vercel the proxy routes stream SSE correctly on Fluid Compute (Node runtime). Set `AIOS_URL` and `AIOS_API_KEY` in the Vercel env. For production, put a network-level protection in front of `AIOS_URL` — the console proxy doesn't add auth beyond the bearer key itself.
+`pnpm start` binds **127.0.0.1 only** — the console wields the full-privilege `AIOS_API_KEY` on every proxied request, so it must never sit on an open interface unauthenticated. To use it from other machines, set `CONSOLE_PASSWORD` in the env (all pages and `/api/aios/*` then require login at `/login`) and run `pnpm start:exposed` behind TLS (reverse proxy) or a VPN like Tailscale.
+
+On Vercel the proxy routes stream SSE correctly on Fluid Compute (Node runtime). Set `AIOS_URL`, `AIOS_API_KEY`, and `CONSOLE_PASSWORD` in the Vercel env, and put network-level protection in front of `AIOS_URL` itself.
 
 ## Architecture
 
