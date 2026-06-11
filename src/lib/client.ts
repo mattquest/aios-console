@@ -9,6 +9,7 @@ import type {
   AgentUpdate,
   AiosEvent,
   Environment,
+  HealthReady,
   ListResponse,
   Session,
 } from "@/lib/types";
@@ -42,6 +43,47 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
   }
   const text = await resp.text();
   return (text ? JSON.parse(text) : (undefined as T)) as T;
+}
+
+/**
+ * Result of probing ``/v1/health/ready``. ``body`` is null when the
+ * deployed aios predates the endpoint (404) — the api is reachable but
+ * worker/connector state is unknown.
+ */
+export interface HealthProbe {
+  status: number;
+  body: HealthReady | null;
+}
+
+function isHealthReady(v: unknown): v is HealthReady {
+  if (typeof v !== "object" || v === null) return false;
+  const o = v as Record<string, unknown>;
+  return (
+    typeof o.worker === "object" &&
+    o.worker !== null &&
+    Array.isArray(o.connections)
+  );
+}
+
+/**
+ * Deliberately not built on ``json<T>``: a 503 from /v1/health/ready still
+ * carries the full readiness payload (db down / stale worker), so the body
+ * must be parsed regardless of HTTP status. Rejects only when the fetch
+ * fails at the network level or the response carries no readiness body at
+ * all (e.g. the proxy 500s because aios itself is unreachable) — callers
+ * treat a rejection as "api down".
+ */
+export async function getHealthReady(): Promise<HealthProbe> {
+  const resp = await fetch(`/api/aios/v1/health/ready`, { cache: "no-store" });
+  if (resp.status === 404) return { status: 404, body: null };
+  let parsed: unknown;
+  try {
+    parsed = await resp.json();
+  } catch {
+    parsed = undefined;
+  }
+  if (isHealthReady(parsed)) return { status: resp.status, body: parsed };
+  throw new ApiError(resp.status, `${resp.status} ${resp.statusText}`);
 }
 
 export const api = {

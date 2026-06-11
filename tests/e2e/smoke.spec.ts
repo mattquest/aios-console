@@ -28,10 +28,22 @@ function buildSse(events: Array<{ event: string; data: unknown }>): string {
 }
 
 async function installMocks(page: Page, fx: Fixture) {
+  // Default healthy readiness payload for the TopNav status strip. Tests
+  // that exercise degraded states register their own route AFTER this one —
+  // Playwright matches the most recently registered route first.
+  await page.route("**/api/aios/v1/health/ready", (route: Route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "ready",
+        db: true,
+        worker: { alive: true, last_heartbeat: new Date().toISOString() },
+        connections: [],
+      }),
+    }),
+  );
+
   await page.route("**/api/aios/v1/agents*", (route: Route) => {
-    // The TopNav health probe also hits this endpoint. Same fixture
-    // body is fine for both — a valid empty-ish list still passes the
-    // r.ok check that drives the green/red dot.
     return route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
@@ -295,4 +307,163 @@ test("a missing session renders not-found, not an empty chat", async ({
   await expect(page.getByTestId("session-not-found")).toContainText(GONE_ID);
   // No composer — a stale link must not invite typing into the void.
   await expect(page.getByTestId("composer-input")).toHaveCount(0);
+});
+
+test("health strip surfaces a dead worker and a live connector", async ({
+  page,
+}) => {
+  await installMocks(page, { sessions: [], events: [], sse: "" });
+
+  // Worker heartbeat stopped 4 minutes ago — the strip must hold that as
+  // "down since" and render a duration, not just a binary red dot.
+  const heartbeat = new Date(Date.now() - 4 * 60_000).toISOString();
+  await page.route("**/api/aios/v1/health/ready", (route: Route) =>
+    route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "degraded",
+        db: true,
+        worker: { alive: false, last_heartbeat: heartbeat },
+        connections: [
+          {
+            id: "conn_01SIGNAL",
+            connector: "signal",
+            external_account_id: "+15555550100",
+            alive: true,
+            last_heartbeat_at: new Date().toISOString(),
+          },
+        ],
+      }),
+    }),
+  );
+
+  await page.goto("/");
+
+  await expect(page.getByTestId("aios-health")).toHaveAttribute(
+    "data-state",
+    "degraded",
+  );
+  // 503 still carried a body, so the api itself reads as up.
+  await expect(page.getByTestId("health-cell-api")).toHaveAttribute(
+    "data-state",
+    "up",
+  );
+  const wrk = page.getByTestId("health-cell-wrk");
+  await expect(wrk).toHaveAttribute("data-state", "down");
+  await expect(wrk).toContainText("wrk/down 4m");
+  await expect(wrk).toHaveAttribute("title", heartbeat);
+  const sig = page.getByTestId("health-cell-signal");
+  await expect(sig).toHaveAttribute("data-state", "up");
+  await expect(sig).toContainText("signal/online");
+});
+
+test("health strip degrades to api-only when /health/ready is absent", async ({
+  page,
+}) => {
+  await installMocks(page, { sessions: [], events: [], sse: "" });
+
+  // Deployed aios predates the endpoint: 404 means "api up, components
+  // unknown" — the nav must render the api cell alone, not crash or go red.
+  await page.route("**/api/aios/v1/health/ready", (route: Route) =>
+    route.fulfill({
+      status: 404,
+      contentType: "application/json",
+      body: JSON.stringify({ detail: "Not Found" }),
+    }),
+  );
+
+  await page.goto("/");
+
+  await expect(page.getByTestId("top-nav")).toBeVisible();
+  await expect(page.getByTestId("aios-health")).toHaveAttribute(
+    "data-state",
+    "ok",
+  );
+  await expect(page.getByTestId("health-cell-api")).toContainText("api/online");
+  await expect(page.getByTestId("health-cell-wrk")).toHaveCount(0);
+  // Rest of the page still works.
+  await expect(page.getByTestId("session-list")).toBeVisible();
+});
+
+test("needs-attention panel partitions errored and awaiting sessions", async ({
+  page,
+}) => {
+  const now = new Date().toISOString();
+  const sessions = [
+    {
+      id: "sess_01CALM",
+      agent_id: AGENT_ID,
+      agent_version: 1,
+      status: "idle",
+      title: "all quiet",
+      created_at: now,
+      updated_at: now,
+    },
+    {
+      id: "sess_01ERR",
+      agent_id: AGENT_ID,
+      agent_version: 1,
+      status: "idle",
+      stop_reason: { type: "error", message: "boom" },
+      title: "exploded run",
+      created_at: now,
+      updated_at: now,
+    },
+    {
+      id: "sess_01WAIT",
+      agent_id: AGENT_ID,
+      agent_version: 1,
+      status: "active",
+      awaiting: [
+        { tool_call_id: "tc_01", name: "send_message", kind: "builtin" },
+      ],
+      title: "approval pending",
+      created_at: now,
+      updated_at: now,
+    },
+  ];
+  await installMocks(page, { sessions, events: [], sse: "" });
+  await page.goto("/");
+
+  await expect(page.getByTestId("needs-attention")).toBeVisible();
+
+  const errored = page.getByTestId("attention-sess_01ERR");
+  await expect(errored).toHaveAttribute("data-status", "errored");
+  await expect(errored).toHaveAttribute("href", "/sessions/sess_01ERR");
+  await expect(errored).toContainText("exploded run");
+  await expect(errored.locator(".text-signal-alert")).toBeVisible();
+
+  const waiting = page.getByTestId("attention-sess_01WAIT");
+  await expect(waiting).toHaveAttribute("data-status", "needs you");
+  await expect(waiting).toHaveAttribute("href", "/sessions/sess_01WAIT");
+  // Pending tool names from session.awaiting surface in the row.
+  await expect(waiting).toContainText("send_message");
+  await expect(waiting.locator(".text-signal-warn").first()).toBeVisible();
+
+  // Healthy sessions stay out of the triage panel.
+  await expect(page.getByTestId("attention-sess_01CALM")).toHaveCount(0);
+});
+
+test("needs-attention panel is absent when every session is healthy", async ({
+  page,
+}) => {
+  const now = new Date().toISOString();
+  const sessions = [
+    {
+      id: "sess_01IDLE",
+      agent_id: AGENT_ID,
+      agent_version: 1,
+      status: "idle",
+      title: "calm session",
+      created_at: now,
+      updated_at: now,
+    },
+  ];
+  await installMocks(page, { sessions, events: [], sse: "" });
+  await page.goto("/");
+
+  // Wait for the list to land before asserting absence of the panel.
+  await expect(page.getByText("calm session")).toBeVisible();
+  await expect(page.getByTestId("needs-attention")).toHaveCount(0);
 });

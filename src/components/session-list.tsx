@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/client";
 import { deriveDisplayStatus, type DisplayStatus, type Session } from "@/lib/types";
+import { NeedsAttention } from "@/components/needs-attention";
 import { NewSessionDialog } from "@/components/new-session-dialog";
 import { cn, toErrorMessage } from "@/lib/utils";
 
@@ -56,6 +57,7 @@ export function SessionList({ activeId }: Props) {
         <NewSessionDialog />
       </header>
       <div className="flex-1 overflow-y-auto">
+        <NeedsAttention sessions={sessions} />
         {loading && <RowPlaceholder text="loading" />}
         {error && (
           <div className="px-4 py-3 font-mono text-[10px] text-signal-alert break-all">

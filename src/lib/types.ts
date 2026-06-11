@@ -73,6 +73,27 @@ export interface Environment {
   name: string;
 }
 
+/** One connector heartbeat as reported by ``GET /v1/health/ready``. */
+export interface HealthConnection {
+  id: string;
+  connector: string;
+  external_account_id: string | null;
+  alive: boolean;
+  last_heartbeat_at: string | null;
+}
+
+/**
+ * Payload of ``GET /v1/health/ready``. The backend serves the same shape
+ * with HTTP 503 when the db is unreachable or the worker is stale, and
+ * HTTP 200 otherwise — dead connections alone never cause a 503.
+ */
+export interface HealthReady {
+  status: "ready" | "degraded";
+  db: boolean;
+  worker: { alive: boolean; last_heartbeat: string | null };
+  connections: HealthConnection[];
+}
+
 export type EventKind = "message" | "lifecycle" | "span" | "interrupt";
 
 export interface AiosEvent {
