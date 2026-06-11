@@ -5,13 +5,14 @@ import { api } from "@/lib/client";
 import type { Agent } from "@/lib/types";
 import { toErrorMessage } from "@/lib/utils";
 import { AgentDialog } from "@/components/agent-dialog";
+import { ErrorBanner } from "@/components/error-banner";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
 
 export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
 
   // All state writes happen in promise callbacks, so the mount effect
   // never sets state synchronously (initial state already shows loading).
@@ -23,7 +24,7 @@ export default function AgentsPage() {
           setAgents(r.data);
           setError(null);
         })
-        .catch((e: unknown) => setError(toErrorMessage(e)))
+        .catch((e: unknown) => setError(e))
         .finally(() => setLoading(false)),
     [],
   );
@@ -72,14 +73,8 @@ export default function AgentsPage() {
         <div className="divider-h" />
 
         {loading && <BlockState label="loading" />}
-        {error && (
-          <div
-            data-testid="agents-error"
-            className="border border-signal-alert/40 bg-signal-alert/5 rounded-sm px-4 py-3 font-mono text-[11px] text-signal-alert break-all"
-          >
-            <span className="bracket-label">fault</span>
-            {error}
-          </div>
+        {error != null && (
+          <ErrorBanner error={error} onRetry={reload} testId="agents-error" />
         )}
         {!loading && !error && agents.length === 0 && (
           <EmptyAgents />

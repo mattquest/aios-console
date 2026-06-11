@@ -8,7 +8,9 @@ export default async function SessionPage({ params }: { params: Params }) {
   return (
     <>
       <SessionList activeId={id} />
-      <SessionView sessionId={id} />
+      {/* Keyed so per-session state (approval decisions, agent name)
+          resets when navigating between sessions. */}
+      <SessionView key={id} sessionId={id} />
     </>
   );
 }

@@ -18,6 +18,8 @@ export class ApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    /** Raw response body, when one was read — lets UIs surface detail. */
+    public readonly body?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -34,7 +36,11 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!resp.ok) {
     const body = await resp.text();
-    throw new ApiError(resp.status, `${resp.status} ${resp.statusText}: ${body}`);
+    throw new ApiError(
+      resp.status,
+      `${resp.status} ${resp.statusText}: ${body}`,
+      body,
+    );
   }
   // Tolerate empty bodies (204 No Content or Content-Length: 0) so callers
   // typed as `Promise<void>` (DELETE, interrupt, ...) don't trip JSON.parse.
@@ -90,8 +96,24 @@ export const api = {
   listSessions: (): Promise<ListResponse<Session>> =>
     json(`/v1/sessions?limit=50`),
   getSession: (id: string): Promise<Session> => json(`/v1/sessions/${id}`),
-  listEvents: (id: string): Promise<ListResponse<AiosEvent>> =>
-    json(`/v1/sessions/${id}/events?limit=500`),
+  /**
+   * Page through a session's event log. First page: ``dir`` + ``limit``
+   * (``backward`` loads the newest tail). Subsequent pages: ``cursor``
+   * alone — the token carries direction and filters.
+   */
+  listEvents: (
+    id: string,
+    opts: { dir?: "forward" | "backward"; limit?: number; cursor?: string } = {},
+  ): Promise<ListResponse<AiosEvent>> => {
+    const params = new URLSearchParams();
+    if (opts.cursor) {
+      params.set("cursor", opts.cursor);
+    } else {
+      if (opts.dir) params.set("dir", opts.dir);
+      params.set("limit", String(opts.limit ?? 500));
+    }
+    return json(`/v1/sessions/${id}/events?${params}`);
+  },
   postMessage: (id: string, content: string) =>
     json(`/v1/sessions/${id}/messages`, {
       method: "POST",

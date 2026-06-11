@@ -114,5 +114,5 @@ export interface ToolCall {
 export interface ListResponse<T> {
   data: T[];
   has_more: boolean;
-  next_after: string | null;
+  next_cursor: string | null;
 }

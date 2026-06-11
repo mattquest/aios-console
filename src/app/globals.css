@@ -234,6 +234,98 @@
   .animate-scan {
     animation: scan-bar 1.6s cubic-bezier(0.2, 0.8, 0.2, 1) 0.4s both;
   }
+  /* Chat message bodies — markdown rendered to match the console idiom. */
+  .chat-markdown > :first-child {
+    margin-top: 0;
+  }
+  .chat-markdown > :last-child {
+    margin-bottom: 0;
+  }
+  .chat-markdown p,
+  .chat-markdown ul,
+  .chat-markdown ol,
+  .chat-markdown blockquote,
+  .chat-markdown pre,
+  .chat-markdown table {
+    margin: 0.6em 0;
+  }
+  .chat-markdown ul,
+  .chat-markdown ol {
+    padding-left: 1.4em;
+  }
+  .chat-markdown ul {
+    list-style: disc;
+  }
+  .chat-markdown ol {
+    list-style: decimal;
+  }
+  .chat-markdown li {
+    margin: 0.2em 0;
+  }
+  .chat-markdown h1,
+  .chat-markdown h2,
+  .chat-markdown h3,
+  .chat-markdown h4,
+  .chat-markdown h5,
+  .chat-markdown h6 {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    margin: 0.9em 0 0.4em;
+    font-size: 1em;
+  }
+  .chat-markdown h1 {
+    font-size: 1.15em;
+  }
+  .chat-markdown h2 {
+    font-size: 1.08em;
+  }
+  .chat-markdown code {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 0.85em;
+    background: color-mix(in oklab, var(--color-muted) 70%, transparent);
+    border: 1px solid color-mix(in oklab, var(--color-border) 70%, transparent);
+    border-radius: 3px;
+    padding: 0.1em 0.35em;
+  }
+  .chat-markdown pre {
+    background: color-mix(in oklab, var(--color-card) 60%, transparent);
+    border: 1px solid color-mix(in oklab, var(--color-border) 70%, transparent);
+    border-radius: 3px;
+    padding: 0.7em 0.9em;
+    overflow-x: auto;
+  }
+  .chat-markdown pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 0.82em;
+  }
+  .chat-markdown a {
+    color: var(--color-signal-info);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .chat-markdown blockquote {
+    border-left: 2px solid var(--color-border);
+    padding-left: 0.9em;
+    color: var(--color-muted-foreground);
+  }
+  .chat-markdown hr {
+    border: none;
+    border-top: 1px solid var(--color-border);
+    margin: 1em 0;
+  }
+  .chat-markdown table {
+    border-collapse: collapse;
+    font-size: 0.9em;
+  }
+  .chat-markdown th,
+  .chat-markdown td {
+    border: 1px solid var(--color-border);
+    padding: 0.3em 0.6em;
+    text-align: left;
+  }
   .divider-h {
     background-image: linear-gradient(
       to right,

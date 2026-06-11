@@ -1,151 +1,11 @@
-import { test, expect, Page, Route } from "@playwright/test";
+import { test, expect, Route } from "@playwright/test";
+import { AGENT_ID, SESSION_ID, buildSse, installMocks } from "./fixtures";
 
 /**
  * End-to-end smoke: create a session, post a message, watch the SSE
  * stream land events, and confirm the inspector surfaces the event log
- * and spans. The aios backend is mocked at the proxy boundary so this
- * runs without a live Postgres or worker — the contract we're testing
- * is "given these bytes from aios, the UI renders correctly."
+ * and spans. Mock plumbing lives in ./fixtures.ts.
  */
-
-const AGENT_ID = "agent_01TEST";
-const ENV_ID = "env_01TEST";
-const SESSION_ID = "sess_01ABCDEF";
-
-type Fixture = {
-  sessions: unknown[];
-  events: unknown[];
-  sse: string;
-};
-
-function buildSse(events: Array<{ event: string; data: unknown }>): string {
-  // Build a static SSE body. The proxy route handler pipes body-to-body,
-  // so when Playwright fulfills with this string, the browser's
-  // EventSource parses each frame as if aios had streamed it.
-  return events
-    .map((e) => `event: ${e.event}\ndata: ${JSON.stringify(e.data)}\n\n`)
-    .join("");
-}
-
-async function installMocks(page: Page, fx: Fixture) {
-  // Default healthy readiness payload for the TopNav status strip. Tests
-  // that exercise degraded states register their own route AFTER this one —
-  // Playwright matches the most recently registered route first.
-  await page.route("**/api/aios/v1/health/ready", (route: Route) =>
-    route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        status: "ready",
-        db: true,
-        worker: { alive: true, last_heartbeat: new Date().toISOString() },
-        connections: [],
-      }),
-    }),
-  );
-
-  await page.route("**/api/aios/v1/agents*", (route: Route) => {
-    return route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        data: [
-          {
-            id: AGENT_ID,
-            version: 1,
-            name: "test-agent",
-            model: "anthropic/claude-sonnet-4-6",
-            system: "",
-            description: null,
-          },
-        ],
-        has_more: false,
-        next_after: null,
-      }),
-    });
-  });
-
-  await page.route("**/api/aios/v1/environments*", (route: Route) =>
-    route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        data: [{ id: ENV_ID, name: "default" }],
-        has_more: false,
-        next_after: null,
-      }),
-    }),
-  );
-
-  await page.route("**/api/aios/v1/sessions?*", (route: Route) =>
-    route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        data: fx.sessions,
-        has_more: false,
-        next_after: null,
-      }),
-    }),
-  );
-
-  await page.route("**/api/aios/v1/sessions", (route: Route) => {
-    if (route.request().method() !== "POST") return route.fallback();
-    const created = {
-      id: SESSION_ID,
-      agent_id: AGENT_ID,
-      agent_version: null,
-      status: "running",
-      title: "smoke session",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    fx.sessions.push(created);
-    return route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify(created),
-    });
-  });
-
-  await page.route(`**/api/aios/v1/sessions/${SESSION_ID}`, (route: Route) =>
-    route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        id: SESSION_ID,
-        agent_id: AGENT_ID,
-        agent_version: 1,
-        status: "idle",
-        title: "smoke session",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }),
-    }),
-  );
-
-  await page.route(
-    `**/api/aios/v1/sessions/${SESSION_ID}/events*`,
-    (route: Route) =>
-      route.fulfill({
-        contentType: "application/json",
-        body: JSON.stringify({
-          data: fx.events,
-          has_more: false,
-          next_after: null,
-        }),
-      }),
-  );
-
-  await page.route(
-    `**/api/aios/sessions/${SESSION_ID}/stream`,
-    (route: Route) =>
-      route.fulfill({
-        contentType: "text/event-stream",
-        headers: { "cache-control": "no-cache" },
-        body: fx.sse,
-      }),
-  );
-
-  await page.route(
-    `**/api/aios/v1/sessions/${SESSION_ID}/messages`,
-    (route: Route) => route.fulfill({ status: 200, body: "{}" }),
-  );
-}
 
 test("home renders session list and new-session dialog", async ({ page }) => {
   await installMocks(page, { sessions: [], events: [], sse: "" });
@@ -278,7 +138,9 @@ test("creating a session navigates to its page and streams events", async ({
   // Spans tab shows the measured model call, and the completed step
   // span resolves to a duration instead of sticking at "in flight…".
   await page.getByRole("tab", { name: /spans/i }).click();
-  await expect(page.getByText("model_request")).toBeVisible();
+  // Exact match: the events tab's row summaries (model_request_start/_end)
+  // can transiently share the DOM while the tab panels swap.
+  await expect(page.getByText("model_request", { exact: true })).toBeVisible();
   await expect(page.getByText(/input_tokens/)).toBeVisible();
   await expect(page.getByText("step", { exact: true })).toBeVisible();
   await expect(page.getByText(/in flight/)).toHaveCount(0);

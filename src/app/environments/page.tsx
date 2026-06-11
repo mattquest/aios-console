@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/client";
 import type { Environment } from "@/lib/types";
-import { toErrorMessage } from "@/lib/utils";
+import { ErrorBanner } from "@/components/error-banner";
 import { NewEnvironmentDialog } from "@/components/new-environment-dialog";
 
 export default function EnvironmentsPage() {
   const [environments, setEnvironments] = useState<Environment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
 
   // All state writes happen in promise callbacks, so the mount effect
   // never sets state synchronously (initial state already shows loading).
@@ -21,7 +21,7 @@ export default function EnvironmentsPage() {
           setEnvironments(r.data);
           setError(null);
         })
-        .catch((e: unknown) => setError(toErrorMessage(e)))
+        .catch((e: unknown) => setError(e))
         .finally(() => setLoading(false)),
     [],
   );
@@ -74,14 +74,12 @@ export default function EnvironmentsPage() {
             <span className="bracket-label">loading</span>…
           </div>
         )}
-        {error && (
-          <div
-            data-testid="environments-error"
-            className="border border-signal-alert/40 bg-signal-alert/5 rounded-sm px-4 py-3 font-mono text-[11px] text-signal-alert break-all"
-          >
-            <span className="bracket-label">fault</span>
-            {error}
-          </div>
+        {error != null && (
+          <ErrorBanner
+            error={error}
+            onRetry={reload}
+            testId="environments-error"
+          />
         )}
         {!loading && !error && environments.length === 0 && (
           <div className="rounded-sm border border-border/60 bg-card/30 backdrop-blur-sm overflow-hidden max-w-2xl">

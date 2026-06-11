@@ -18,7 +18,23 @@ type Ctx = { params: Promise<{ id: string }> };
  */
 export async function GET(req: NextRequest, ctx: Ctx): Promise<Response> {
   const { id } = await ctx.params;
-  const upstream = await aiosStream(`/v1/sessions/${id}/stream`, req.signal);
+  // Forward the query string so ``?after_seq=N`` reaches aios — the client
+  // loads the backlog over the paged events API and tails only the rest.
+  let upstream: Response;
+  try {
+    upstream = await aiosStream(
+      `/v1/sessions/${id}/stream${req.nextUrl.search}`,
+      req.signal,
+    );
+  } catch {
+    // aios unreachable (or the request aborted mid-connect): a clean 502
+    // lets the browser's EventSource back off and retry instead of the
+    // route handler crashing with an unhandled fetch rejection.
+    return Response.json(
+      { detail: "aios unreachable", aios_url: process.env.AIOS_URL ?? null },
+      { status: 502 },
+    );
+  }
 
   return new Response(upstream.body, {
     status: upstream.status,

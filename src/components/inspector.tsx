@@ -11,6 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { contentText } from "@/lib/messages";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 
 interface Props {
@@ -23,12 +24,22 @@ const TAB_DEFS = [
   { value: "payload", label: "payload" },
 ] as const;
 
+/** Desktop rail — hidden below lg, where a toggleable sheet takes over. */
 export function Inspector({ events }: Props) {
   return (
     <aside
       data-testid="inspector"
-      className="w-[440px] shrink-0 border-l border-border/70 flex flex-col bg-muted/10"
+      className="w-[440px] shrink-0 border-l border-border/70 hidden lg:flex flex-col bg-muted/10"
     >
+      <InspectorBody events={events} />
+    </aside>
+  );
+}
+
+/** Header strip + tabs, shared by the desktop rail and the mobile sheet. */
+export function InspectorBody({ events }: Props) {
+  return (
+    <>
       <div className="px-3 py-2 border-b border-border/60 flex items-center justify-between">
         <div className="flex items-center gap-2 text-pico text-muted-foreground">
           <span className="size-1.5 rounded-full bg-signal-info animate-signal" />
@@ -64,7 +75,7 @@ export function Inspector({ events }: Props) {
           <PayloadTab events={events} />
         </TabsContent>
       </Tabs>
-    </aside>
+    </>
   );
 }
 
@@ -195,7 +206,7 @@ function summariseEvent(event: AiosEvent): string {
   const data = event.data;
   if (event.kind === "message") {
     const role = (data as { role?: string }).role ?? "?";
-    const content = (data as { content?: string }).content ?? "";
+    const content = contentText((data as { content?: unknown }).content);
     const tc = (data as { tool_calls?: { function?: { name?: string } }[] })
       .tool_calls;
     if (tc && tc.length) {

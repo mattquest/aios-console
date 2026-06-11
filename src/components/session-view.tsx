@@ -5,10 +5,23 @@ import { useEffect, useMemo, useState } from "react";
 import { useSessionStream } from "@/hooks/use-session-stream";
 import { Chat } from "@/components/chat";
 import { Composer } from "@/components/composer";
-import { Inspector } from "@/components/inspector";
-import { Button } from "@/components/ui/button";
+import { Inspector, InspectorBody } from "@/components/inspector";
+import { MobileSessionsDrawer } from "@/components/session-list";
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { PanelRight } from "lucide-react";
 import { api, ApiError } from "@/lib/client";
-import { deriveDisplayStatus, type AiosEvent, type DisplayStatus, type Session } from "@/lib/types";
+import {
+  deriveDisplayStatus,
+  type AiosEvent,
+  type AwaitingToolCall,
+  type DisplayStatus,
+  type Session,
+} from "@/lib/types";
 import { cn, toErrorMessage } from "@/lib/utils";
 
 interface Props {
@@ -19,6 +32,12 @@ export function SessionView({ sessionId }: Props) {
   const stream = useSessionStream(sessionId);
   const [session, setSession] = useState<Session | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [agentName, setAgentName] = useState<string | null>(null);
+  // Approval decisions already submitted — hide their cards immediately
+  // instead of waiting for the next session poll to clear `awaiting`.
+  const [decided, setDecided] = useState<Set<string>>(new Set());
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,6 +63,40 @@ export function SessionView({ sessionId }: Props) {
       clearInterval(id);
     };
   }, [sessionId]);
+
+  const agentId = session?.agent_id ?? null;
+  useEffect(() => {
+    if (!agentId) return;
+    let cancelled = false;
+    api
+      .getAgent(agentId)
+      .then((a) => {
+        if (!cancelled) setAgentName(a.name);
+      })
+      .catch(() => {
+        /* name is cosmetic — the card falls back to "the assistant" */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [agentId]);
+
+  const confirm = async (toolCallId: string, result: "allow" | "deny") => {
+    setConfirming(toolCallId);
+    setConfirmError(null);
+    try {
+      await api.confirmTool(sessionId, toolCallId, result);
+      setDecided((prev) => new Set(prev).add(toolCallId));
+    } catch (e) {
+      setConfirmError(toErrorMessage(e));
+    } finally {
+      setConfirming(null);
+    }
+  };
+
+  const awaiting = (session?.awaiting ?? []).filter(
+    (a) => !decided.has(a.tool_call_id),
+  );
 
   const displayStatus = session ? deriveDisplayStatus(session) : null;
 
@@ -76,6 +129,7 @@ export function SessionView({ sessionId }: Props) {
   return (
     <div className="flex-1 flex flex-col min-w-0">
       <SessionHeader
+        sessionId={sessionId}
         session={session}
         displayStatus={displayStatus}
         connected={stream.connected}
@@ -84,15 +138,23 @@ export function SessionView({ sessionId }: Props) {
       <div className="flex-1 flex min-h-0">
         <div className="flex-1 flex flex-col min-w-0">
           <SessionNotices
-            session={session}
+            awaiting={awaiting}
             displayStatus={displayStatus}
             events={stream.events}
             streamError={stream.connected ? null : stream.error}
+            confirmError={confirmError}
           />
           <Chat
             events={stream.events}
             streamingContent={stream.streamingContent}
             connected={stream.connected}
+            awaiting={awaiting}
+            agentName={agentName}
+            confirmingId={confirming}
+            onConfirm={(id, result) => void confirm(id, result)}
+            hasEarlier={stream.hasEarlier}
+            loadingEarlier={stream.loadingEarlier}
+            onLoadEarlier={stream.loadEarlier}
           />
           <Composer
             sessionId={sessionId}
@@ -138,32 +200,19 @@ function latestFailureDetail(events: AiosEvent[]): { type?: string; message?: st
 }
 
 function SessionNotices({
-  session,
+  awaiting,
   displayStatus,
   events,
   streamError,
+  confirmError,
 }: {
-  session: Session | null;
+  awaiting: AwaitingToolCall[];
   displayStatus: DisplayStatus | null;
   events: AiosEvent[];
   streamError: string | null;
+  confirmError: string | null;
 }) {
   const failure = useMemo(() => latestFailureDetail(events), [events]);
-  const [confirmError, setConfirmError] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState<string | null>(null);
-
-  const confirm = async (toolCallId: string, result: "allow" | "deny") => {
-    if (!session) return;
-    setConfirming(toolCallId);
-    setConfirmError(null);
-    try {
-      await api.confirmTool(session.id, toolCallId, result);
-    } catch (e) {
-      setConfirmError(toErrorMessage(e));
-    } finally {
-      setConfirming(null);
-    }
-  };
 
   return (
     <div data-testid="session-notices" className="shrink-0">
@@ -187,42 +236,15 @@ function SessionNotices({
           and is retrying automatically — no action needed yet.
         </Notice>
       )}
-      {(session?.awaiting ?? []).map((a) =>
-        a.kind === "custom" ? (
+      {/* always_ask approvals render as inline cards in the chat itself. */}
+      {awaiting
+        .filter((a) => a.kind === "custom")
+        .map((a) => (
           <Notice key={a.tool_call_id} tone="warn" label="waiting">
             Waiting for an external tool result: <code>{a.name}</code>. The
             connected client (e.g. the connector) must complete it.
           </Notice>
-        ) : (
-          <Notice key={a.tool_call_id} tone="warn" label="approval">
-            <span className="flex-1">
-              The assistant wants to run <code>{a.name}</code> and needs your
-              approval.
-            </span>
-            <span className="flex items-center gap-2 shrink-0">
-              <Button
-                size="sm"
-                className="h-6 font-mono text-[10px] uppercase tracking-wider"
-                disabled={confirming === a.tool_call_id}
-                onClick={() => void confirm(a.tool_call_id, "allow")}
-                data-testid={`approve-${a.name}`}
-              >
-                allow
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-6 font-mono text-[10px] uppercase tracking-wider border-signal-alert/50 text-signal-alert hover:bg-signal-alert/10"
-                disabled={confirming === a.tool_call_id}
-                onClick={() => void confirm(a.tool_call_id, "deny")}
-                data-testid={`deny-${a.name}`}
-              >
-                deny
-              </Button>
-            </span>
-          </Notice>
-        ),
-      )}
+        ))}
       {confirmError && (
         <Notice tone="alert" label="error">
           Couldn&apos;t submit that decision: {confirmError}
@@ -264,11 +286,13 @@ function Notice({
 }
 
 function SessionHeader({
+  sessionId,
   session,
   displayStatus,
   connected,
   events,
 }: {
+  sessionId: string;
   session: Session | null;
   displayStatus: DisplayStatus | null;
   connected: boolean;
@@ -281,7 +305,9 @@ function SessionHeader({
       data-testid="session-header"
       className="shrink-0 border-b border-border/70 bg-background/60 backdrop-blur-sm"
     >
-      <div className="px-4 py-2.5 flex items-center gap-4">
+      <div className="px-3 sm:px-4 py-2.5 flex items-center gap-3 sm:gap-4">
+        <MobileSessionsDrawer activeId={sessionId} />
+
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <span className="text-pico text-muted-foreground/70 shrink-0">
             sid
@@ -292,19 +318,19 @@ function SessionHeader({
           </span>
         </div>
 
-        <div className="h-4 w-px bg-border/60 shrink-0" />
+        <div className="h-4 w-px bg-border/60 shrink-0 hidden sm:block" />
 
         <div className="shrink-0">
           <StatusPill status={displayStatus} />
         </div>
 
         {session?.agent_version != null && (
-          <span className="font-mono text-[10px] text-muted-foreground/90 border border-border/60 rounded-sm px-1.5 py-0.5 tracking-[0.14em] uppercase shrink-0 tabular-nums">
+          <span className="hidden sm:inline-block font-mono text-[10px] text-muted-foreground/90 border border-border/60 rounded-sm px-1.5 py-0.5 tracking-[0.14em] uppercase shrink-0 tabular-nums">
             v{session.agent_version}
           </span>
         )}
 
-        <div className="flex items-center gap-4 shrink-0">
+        <div className="hidden md:flex items-center gap-4 shrink-0">
           <Stat label="evt" value={stats.events} />
           <Stat label="spn" value={stats.spans} />
           <Stat label="tool" value={stats.tools} />
@@ -319,8 +345,36 @@ function SessionHeader({
             <span>sse/{connected ? "live" : "idle"}</span>
           </div>
         </div>
+
+        <MobileInspector events={events} />
       </div>
     </header>
+  );
+}
+
+/**
+ * Below lg the inspector rail is hidden; this toggle opens the same
+ * panels in a right-hand sheet.
+ */
+function MobileInspector({ events }: { events: AiosEvent[] }) {
+  return (
+    <Sheet>
+      <SheetTrigger
+        data-testid="inspector-toggle"
+        className="lg:hidden inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground border border-border/60 rounded-sm px-2 py-1 transition-colors shrink-0"
+      >
+        <PanelRight className="size-3" />
+        <span className="hidden sm:inline">inspect</span>
+      </SheetTrigger>
+      <SheetContent
+        side="right"
+        className="w-[92vw] max-w-[440px] p-0 gap-0 flex flex-col bg-background"
+        data-testid="inspector-sheet"
+      >
+        <SheetTitle className="sr-only">inspector</SheetTitle>
+        <InspectorBody events={events} />
+      </SheetContent>
+    </Sheet>
   );
 }
 

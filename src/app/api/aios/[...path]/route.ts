@@ -21,7 +21,21 @@ async function forward(req: NextRequest, ctx: Ctx): Promise<Response> {
     };
   }
 
-  const upstreamResp = await aiosFetch(upstream, init);
+  let upstreamResp: Response;
+  try {
+    upstreamResp = await aiosFetch(upstream, init);
+  } catch {
+    // aios itself is unreachable (connection refused, DNS, AIOS_URL unset).
+    // Return a structured 502 instead of a bare 500 so the browser can say
+    // "can't reach aios at <url>" rather than "something broke".
+    return Response.json(
+      {
+        detail: "aios unreachable",
+        aios_url: process.env.AIOS_URL ?? null,
+      },
+      { status: 502 },
+    );
+  }
   // Pass body + status straight through so FastAPI error shapes (detail,
   // code) reach the browser unmodified — the dev console needs to see
   // exactly what aios said.

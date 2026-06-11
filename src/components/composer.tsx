@@ -50,7 +50,7 @@ export function Composer({ sessionId, status }: Props) {
 
   return (
     <div className="border-t border-border/60 bg-background/70 backdrop-blur-sm">
-      <div className="max-w-3xl mx-auto px-6 lg:px-8 py-4">
+      <div className="max-w-3xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
         <div className="relative rounded-sm border border-border/60 bg-card/30 focus-within:border-signal/60 transition-colors">
           <div className="absolute left-3 top-2.5 font-mono text-[12px] text-signal/80 select-none pointer-events-none">
             {running ? "›" : "$"}
@@ -89,7 +89,7 @@ export function Composer({ sessionId, status }: Props) {
                   {status}
                 </span>
               )}
-              <span className="text-muted-foreground/40 tabular-nums normal-case tracking-normal">
+              <span className="hidden sm:inline text-muted-foreground/40 tabular-nums normal-case tracking-normal">
                 {String(chars).padStart(3, "0")} ch
               </span>
             </div>
