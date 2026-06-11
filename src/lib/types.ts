@@ -116,3 +116,32 @@ export interface ListResponse<T> {
   has_more: boolean;
   next_cursor: string | null;
 }
+
+export type UsageGranularity = "day" | "session" | "model";
+
+/**
+ * One bucket from ``GET /v1/usage``. ``key`` is a UTC date (YYYY-MM-DD),
+ * a session id, or a model string depending on granularity.
+ *
+ * Cost honesty: ``cost_usd_known`` sums only the requests whose cost the
+ * provider actually reported; ``cost_usd_estimated_null_requests`` counts
+ * the requests with no cost data — they are never priced client-side.
+ */
+export interface UsageRow {
+  key: string;
+  session_title: string | null;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_creation_tokens: number;
+  requests: number;
+  cost_usd_known: number;
+  cost_usd_estimated_null_requests: number;
+}
+
+export interface UsageReport {
+  granularity: UsageGranularity;
+  since: string | null;
+  until: string | null;
+  rows: UsageRow[];
+}

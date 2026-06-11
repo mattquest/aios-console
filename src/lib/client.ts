@@ -12,6 +12,8 @@ import type {
   HealthReady,
   ListResponse,
   Session,
+  UsageGranularity,
+  UsageReport,
 } from "@/lib/types";
 
 export class ApiError extends Error {
@@ -162,4 +164,12 @@ export const api = {
     json(`/v1/environments?limit=50`),
   createEnvironment: (body: { name: string }): Promise<Environment> =>
     json(`/v1/environments`, { method: "POST", body: JSON.stringify(body) }),
+  getUsage: (
+    granularity: UsageGranularity,
+    since?: string,
+  ): Promise<UsageReport> => {
+    const params = new URLSearchParams({ granularity });
+    if (since) params.set("since", since);
+    return json(`/v1/usage?${params}`);
+  },
 };
