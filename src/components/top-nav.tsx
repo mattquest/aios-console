@@ -202,7 +202,8 @@ function HealthCell({
       className={cn("flex items-center gap-1.5", styles.text)}
       title={isDown ? new Date(downSince).toISOString() : `${label} ${styles.word}`}
     >
-      <span className={cn("size-1.5 rounded-full", styles.dot)} />
+      {/* Decorative — the "{label}/{word}" text beside it carries the state. */}
+      <span aria-hidden className={cn("size-1.5 rounded-full", styles.dot)} />
       <span>
         {label}/{styles.word}
         {downFor ? ` ${downFor}` : ""}

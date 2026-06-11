@@ -70,7 +70,7 @@ export function Composer({ sessionId, status }: Props) {
             className="font-sans text-[13px] resize-none border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 pl-7 pb-10"
           />
           <div className="absolute inset-x-2 bottom-1.5 flex items-center justify-between gap-2">
-            <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground flex items-center gap-3">
+            <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground flex items-center gap-3">
               {error ? (
                 <span className="text-signal-alert normal-case tracking-normal">
                   {error}
@@ -78,6 +78,7 @@ export function Composer({ sessionId, status }: Props) {
               ) : (
                 <span className="flex items-center gap-1.5">
                   <span
+                    aria-hidden
                     className={cn(
                       "size-1 rounded-full",
                       running

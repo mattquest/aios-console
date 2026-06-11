@@ -286,6 +286,9 @@ function WizardStep({
     >
       <div className="px-4 py-2 flex items-center gap-2 border-b border-border/50 text-pico text-muted-foreground">
         <span
+          // The dot's color is the only carrier of the step state — name it.
+          role="img"
+          aria-label={`step ${state}`}
           className={cn(
             "size-1.5 rounded-full",
             state === "done"

@@ -67,6 +67,28 @@ export function Chat({
     `${messageEvents.length}·${streamingContent.length}·${inFlight?.elapsedMs ?? 0}·${approvals.length}`,
   );
 
+  // Screen-reader announcement: the latest user-visible assistant utterance.
+  // Completed messages only (the streaming buffer would announce per-token);
+  // monologues opted out of delivery, so they stay silent here too. When the
+  // text changes, the polite live region below reads it out.
+  const announcement = useMemo(() => {
+    for (let i = messageEvents.length - 1; i >= 0; i--) {
+      const data = messageEvents[i].data as {
+        role?: string;
+        content?: unknown;
+        tool_calls?: ToolCall[];
+      };
+      if (data.role !== "assistant") continue;
+      const text = contentText(data.content);
+      if (text) return isMonologue(text) ? null : text;
+      const sends = (data.tool_calls ?? [])
+        .map((tc) => connectorSendText(tc))
+        .filter((t): t is string => t !== null);
+      return sends.length > 0 ? sends.join("\n") : null;
+    }
+    return null;
+  }, [messageEvents]);
+
   const lastMessage = messageEvents.at(-1);
   const showStreaming =
     streamingContent.length > 0 &&
@@ -95,47 +117,59 @@ export function Chat({
   };
 
   return (
-    <div
-      ref={scrollRef}
-      data-testid="chat-messages"
-      className="flex-1 overflow-y-auto overflow-x-hidden"
-    >
-      <div className="max-w-3xl mx-auto px-4 sm:px-8 py-10 space-y-8">
-        {hasEarlier && (
-          <div className="flex justify-center">
-            <button
-              type="button"
-              data-testid="load-earlier"
-              onClick={handleLoadEarlier}
-              disabled={loadingEarlier}
-              className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground border border-border/60 hover:border-foreground/40 rounded-sm px-3 py-1.5 transition-colors disabled:opacity-50"
-            >
-              {loadingEarlier ? "loading…" : "↑ load earlier"}
-            </button>
-          </div>
-        )}
-        {messageEvents.length === 0 && !showStreaming && !showGenerating && (
-          <ChatEmptyState />
-        )}
-        {messageEvents.map((e) => (
-          <MessageRow key={e.id} event={e} />
-        ))}
-        {approvals.map((a) => (
-          <ApprovalCard
-            key={a.tool_call_id}
-            awaiting={a}
-            events={events}
-            agentName={agentName}
-            confirming={confirmingId === a.tool_call_id}
-            onConfirm={onConfirm}
-          />
-        ))}
-        {showStreaming && (
-          <StreamingAssistant content={streamingContent} connected={connected} />
-        )}
-        {showGenerating && inFlight && <GeneratingIndicator inFlight={inFlight} />}
+    <>
+      {/* Outside the scroll container so transcript text queries (and the
+          visual tree) see each message exactly once. */}
+      <div
+        role="status"
+        aria-live="polite"
+        data-testid="chat-live-region"
+        className="sr-only"
+      >
+        {announcement}
       </div>
-    </div>
+      <div
+        ref={scrollRef}
+        data-testid="chat-messages"
+        className="flex-1 overflow-y-auto overflow-x-hidden"
+      >
+        <div className="max-w-3xl mx-auto px-4 sm:px-8 py-10 space-y-8">
+          {hasEarlier && (
+            <div className="flex justify-center">
+              <button
+                type="button"
+                data-testid="load-earlier"
+                onClick={handleLoadEarlier}
+                disabled={loadingEarlier}
+                className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground border border-border/60 hover:border-foreground/40 rounded-sm px-3 py-1.5 transition-colors disabled:opacity-50"
+              >
+                {loadingEarlier ? "loading…" : "↑ load earlier"}
+              </button>
+            </div>
+          )}
+          {messageEvents.length === 0 && !showStreaming && !showGenerating && (
+            <ChatEmptyState />
+          )}
+          {messageEvents.map((e) => (
+            <MessageRow key={e.id} event={e} />
+          ))}
+          {approvals.map((a) => (
+            <ApprovalCard
+              key={a.tool_call_id}
+              awaiting={a}
+              events={events}
+              agentName={agentName}
+              confirming={confirmingId === a.tool_call_id}
+              onConfirm={onConfirm}
+            />
+          ))}
+          {showStreaming && (
+            <StreamingAssistant content={streamingContent} connected={connected} />
+          )}
+          {showGenerating && inFlight && <GeneratingIndicator inFlight={inFlight} />}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -158,7 +192,7 @@ function GeneratingIndicator({
     >
       <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground pt-1 flex items-baseline gap-2">
         <span>model</span>
-        <span className="size-1.5 rounded-full bg-signal-warn animate-signal" />
+        <span aria-hidden className="size-1.5 rounded-full bg-signal-warn animate-signal" />
       </div>
       <div className="flex items-baseline gap-3 font-mono text-[11px] text-muted-foreground">
         <span className="text-signal-warn uppercase tracking-[0.18em]">
@@ -199,7 +233,7 @@ function ChatEmptyState() {
       <div className="rounded-sm border border-border/60 bg-card/40 backdrop-blur-sm overflow-hidden">
         <div className="px-4 py-2 flex items-center justify-between border-b border-border/50 text-pico text-muted-foreground">
           <div className="flex items-center gap-2">
-            <span className="size-1.5 rounded-full bg-signal animate-signal" />
+            <span aria-hidden className="size-1.5 rounded-full bg-signal animate-signal" />
             <span>session/idle</span>
           </div>
           <span className="normal-case tracking-[0.12em]">awaiting stdin</span>
@@ -276,7 +310,8 @@ function RoleGutter({
       {time && (
         <div
           data-testid="message-time"
-          className="font-mono text-[9px] tabular-nums text-muted-foreground/50"
+          title={at}
+          className="font-mono text-[10px] tabular-nums text-muted-foreground/50"
         >
           {time}
         </div>
@@ -436,6 +471,7 @@ function StreamingAssistant({
       <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground pt-1 flex items-baseline gap-2">
         <span>model</span>
         <span
+          aria-hidden
           className={cn(
             "size-1.5 rounded-full",
             connected ? "bg-signal animate-signal" : "bg-signal-warn",
@@ -505,7 +541,7 @@ function ApprovalCard({
     >
       <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-signal-warn pt-1 flex items-baseline gap-2">
         <span>hold</span>
-        <span className="size-1.5 rounded-full bg-signal-warn animate-signal" />
+        <span aria-hidden className="size-1.5 rounded-full bg-signal-warn animate-signal" />
       </div>
       <div className="rounded-sm border border-signal-warn/40 bg-signal-warn/5 min-w-0">
         <div className="px-3 py-2 border-b border-signal-warn/20 flex items-center gap-2">
@@ -544,7 +580,7 @@ function ApprovalCard({
           >
             deny
           </Button>
-          <span className="ml-auto font-mono text-[9px] uppercase tracking-wider text-muted-foreground/50">
+          <span className="ml-auto font-mono text-[10px] uppercase tracking-wider text-muted-foreground/50">
             {confirming ? "submitting…" : "session paused on this decision"}
           </span>
         </div>
@@ -565,13 +601,16 @@ function ToolCallCard({ call }: { call: ToolCall }) {
       <div className="rounded-sm border border-border/60 bg-card/40 backdrop-blur-sm">
         <CollapsibleTrigger className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-muted/30 transition-colors group">
           <ChevronRight className="size-3 transition-transform group-data-[state=open]:rotate-90 text-muted-foreground" />
-          <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-signal">
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-signal">
             invoke
           </span>
           <span className="font-mono text-[11px] text-foreground">
             {call.function.name}
           </span>
-          <span className="ml-auto font-mono text-[9px] uppercase tracking-wider text-muted-foreground/60">
+          <span
+            title={call.id}
+            className="ml-auto font-mono text-[10px] uppercase tracking-wider text-muted-foreground/60"
+          >
             {call.id.slice(0, 12)}
           </span>
         </CollapsibleTrigger>
@@ -619,7 +658,7 @@ function ToolResultRow({ event }: { event: AiosEvent }) {
             <ChevronRight className="size-3 transition-transform group-data-[state=open]:rotate-90 text-muted-foreground" />
             <span
               className={cn(
-                "font-mono text-[9px] uppercase tracking-[0.18em]",
+                "font-mono text-[10px] uppercase tracking-[0.18em]",
                 data.is_error ? "text-signal-alert" : "text-signal",
               )}
             >
@@ -628,7 +667,10 @@ function ToolResultRow({ event }: { event: AiosEvent }) {
             <span className="font-mono text-[11px] text-foreground">
               {data.name ?? "tool"}
             </span>
-            <span className="ml-auto font-mono text-[9px] uppercase tracking-wider text-muted-foreground/60">
+            <span
+              title={data.tool_call_id}
+              className="ml-auto font-mono text-[10px] uppercase tracking-wider text-muted-foreground/60"
+            >
               {data.tool_call_id?.slice(0, 12) ?? "?"}
             </span>
           </CollapsibleTrigger>

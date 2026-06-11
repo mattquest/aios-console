@@ -53,7 +53,7 @@ export function HomeMain() {
     return (
       <main className="flex-1 min-w-0 overflow-y-auto">
         <div className="max-w-2xl mx-auto px-4 sm:px-8 py-10 flex items-center gap-2 text-pico text-muted-foreground">
-          <span className="size-1.5 rounded-full bg-signal-warn animate-signal" />
+          <span aria-hidden className="size-1.5 rounded-full bg-signal-warn animate-signal" />
           <span>probing backend…</span>
         </div>
       </main>

@@ -42,7 +42,7 @@ export function InspectorBody({ events }: Props) {
     <>
       <div className="px-3 py-2 border-b border-border/60 flex items-center justify-between">
         <div className="flex items-center gap-2 text-pico text-muted-foreground">
-          <span className="size-1.5 rounded-full bg-signal-info animate-signal" />
+          <span aria-hidden className="size-1.5 rounded-full bg-signal-info animate-signal" />
           <span>inspector</span>
           <span className="text-muted-foreground/40">·</span>
           <span className="text-foreground/80 tabular-nums normal-case tracking-[0.12em]">

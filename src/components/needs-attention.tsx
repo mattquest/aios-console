@@ -48,13 +48,14 @@ export function NeedsAttention({ sessions }: { sessions: Session[] }) {
               className="block px-4 py-2 border-b border-border/30 hover:bg-muted/30 transition-colors"
             >
               <div className="flex items-center gap-2">
-                <span className={cn("size-1.5 rounded-full shrink-0", dot)} />
+                {/* Decorative — the status word at the row's end names it. */}
+                <span aria-hidden className={cn("size-1.5 rounded-full shrink-0", dot)} />
                 <span className="font-mono text-[11px] truncate text-foreground/90 flex-1">
                   {s.title || s.id.slice(0, 16) + "…"}
                 </span>
                 <span
                   className={cn(
-                    "font-mono text-[9px] uppercase tracking-wider shrink-0",
+                    "font-mono text-[10px] uppercase tracking-wider shrink-0",
                     text,
                   )}
                 >
@@ -62,7 +63,7 @@ export function NeedsAttention({ sessions }: { sessions: Session[] }) {
                 </span>
               </div>
               {status === "needs you" && s.awaiting && s.awaiting.length > 0 && (
-                <div className="mt-0.5 pl-3.5 font-mono text-[9px] text-signal-warn/80 truncate">
+                <div className="mt-0.5 pl-3.5 font-mono text-[10px] text-signal-warn/80 truncate">
                   awaiting {s.awaiting.map((a) => a.name).join(", ")}
                 </div>
               )}

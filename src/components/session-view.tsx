@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSessionStream } from "@/hooks/use-session-stream";
 import { Chat } from "@/components/chat";
+import { TOGGLE_INSPECTOR_EVENT } from "@/components/command-palette";
 import { Composer } from "@/components/composer";
 import { Inspector, InspectorBody } from "@/components/inspector";
 import { MobileSessionsDrawer } from "@/components/session-list";
@@ -38,6 +39,15 @@ export function SessionView({ sessionId }: Props) {
   const [decided, setDecided] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  // Desktop inspector rail visibility — flipped by the ⌘K palette's
+  // "toggle inspector" command via a window CustomEvent.
+  const [inspectorVisible, setInspectorVisible] = useState(true);
+
+  useEffect(() => {
+    const onToggle = () => setInspectorVisible((v) => !v);
+    window.addEventListener(TOGGLE_INSPECTOR_EVENT, onToggle);
+    return () => window.removeEventListener(TOGGLE_INSPECTOR_EVENT, onToggle);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -161,7 +171,7 @@ export function SessionView({ sessionId }: Props) {
             status={session?.status ?? "unknown"}
           />
         </div>
-        <Inspector events={stream.events} />
+        {inspectorVisible && <Inspector events={stream.events} />}
       </div>
     </div>
   );
@@ -331,12 +341,13 @@ function SessionHeader({
         )}
 
         <div className="hidden md:flex items-center gap-4 shrink-0">
-          <Stat label="evt" value={stats.events} />
-          <Stat label="spn" value={stats.spans} />
-          <Stat label="tool" value={stats.tools} />
+          <Stat label="evt" title="events" value={stats.events} />
+          <Stat label="spn" title="spans" value={stats.spans} />
+          <Stat label="tool" title="tool results" value={stats.tools} />
           <div className="h-4 w-px bg-border/60" />
           <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
             <span
+              aria-hidden
               className={cn(
                 "size-1.5 rounded-full",
                 connected ? "bg-signal animate-signal" : "bg-signal-warn",
@@ -361,6 +372,8 @@ function MobileInspector({ events }: { events: AiosEvent[] }) {
     <Sheet>
       <SheetTrigger
         data-testid="inspector-toggle"
+        // Below sm the "inspect" word is hidden and this is icon-only.
+        aria-label="open inspector"
         className="lg:hidden inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground border border-border/60 rounded-sm px-2 py-1 transition-colors shrink-0"
       >
         <PanelRight className="size-3" />
@@ -396,9 +409,18 @@ function deriveStats(events: AiosEvent[]): SessionStats {
   return { events: events.length, spans, tools };
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({
+  label,
+  title,
+  value,
+}: {
+  label: string;
+  /** Expands the pico abbreviation on hover. */
+  title: string;
+  value: number;
+}) {
   return (
-    <div className="flex items-baseline gap-1.5">
+    <div className="flex items-baseline gap-1.5" title={title}>
       <span className="text-pico text-muted-foreground/70">{label}</span>
       <span className="font-mono text-[12px] tabular-nums text-foreground">
         {String(value).padStart(3, "0")}
@@ -419,6 +441,7 @@ function StatusPill({ status }: { status: DisplayStatus | null }) {
   return (
     <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-foreground/85 border border-border/60 rounded-sm px-1.5 py-0.5">
       <span
+        aria-hidden
         className={cn(
           "size-1.5 rounded-full",
           entry?.color ?? "bg-muted-foreground/40",

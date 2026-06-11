@@ -31,9 +31,21 @@ function agentLabel(agents: Agent[], id: string): string | null {
   return a ? `${a.name} · ${a.model}` : null;
 }
 
-export function NewSessionDialog() {
+interface Props {
+  /** Controlled mode — no trigger rendered. Used by the command palette. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+export function NewSessionDialog({ open: controlledOpen, onOpenChange }: Props = {}) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const controlled = controlledOpen !== undefined;
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = controlled ? controlledOpen : uncontrolledOpen;
+  const setOpen = (next: boolean) => {
+    if (controlled) onOpenChange?.(next);
+    else setUncontrolledOpen(next);
+  };
   const [agents, setAgents] = useState<Agent[]>([]);
   const [environments, setEnvironments] = useState<Environment[]>([]);
   const [agentId, setAgentId] = useState<string>("");
@@ -77,19 +89,21 @@ export function NewSessionDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 px-2 font-mono text-[10px] uppercase"
-            data-testid="new-session-button"
-          />
-        }
-      >
-        <Plus className="size-3" />
-        new
-      </DialogTrigger>
+      {!controlled && (
+        <DialogTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 font-mono text-[10px] uppercase"
+              data-testid="new-session-button"
+            />
+          }
+        >
+          <Plus className="size-3" />
+          new
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-mono">new session</DialogTitle>

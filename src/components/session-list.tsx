@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/client";
+import { publishSessions } from "@/lib/session-store";
 import { deriveDisplayStatus, type DisplayStatus, type Session } from "@/lib/types";
 import { ErrorBanner } from "@/components/error-banner";
 import { NeedsAttention } from "@/components/needs-attention";
@@ -74,6 +75,8 @@ function SessionListContent({
         if (!cancelled) {
           setSessions(resp.data);
           setError(null);
+          // Feed the ⌘K palette's jump-to-session list off this poll.
+          publishSessions(resp.data);
         }
       } catch (e) {
         if (!cancelled) setError(e);
@@ -148,7 +151,10 @@ function SessionListContent({
                   </span>
                   <StatusDot session={s} />
                 </div>
-                <div className="font-mono text-[9px] text-muted-foreground/60 truncate mt-1 pl-6">
+                <div
+                  title={s.id}
+                  className="font-mono text-[10px] text-muted-foreground/60 truncate mt-1 pl-6"
+                >
                   {s.id}
                 </div>
               </Link>
@@ -180,6 +186,9 @@ function StatusDot({ session }: { session: Session }) {
   const status = deriveDisplayStatus(session);
   return (
     <span
+      // The dot is the row's only status carrier — name it for AT.
+      role="img"
+      aria-label={status}
       className={cn(
         "size-1.5 rounded-full shrink-0",
         STATUS_COLOR[status] ?? "bg-muted-foreground/40",

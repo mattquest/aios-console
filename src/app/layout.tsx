@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, JetBrains_Mono } from "next/font/google";
 import { TopNav } from "@/components/top-nav";
+import { CommandPalette } from "@/components/command-palette";
 import "./globals.css";
 
 const geist = Geist({
@@ -61,6 +62,8 @@ export default function RootLayout({
           <TopNav />
           <div className="flex-1 flex min-h-0 min-w-0">{children}</div>
         </div>
+        {/* ⌘K — global, portal-rendered, inert until invoked. */}
+        <CommandPalette />
       </body>
     </html>
   );
