@@ -21,12 +21,13 @@ export function useInFlightSpan(events: AiosEvent[]): InFlightSpan | null {
   const [now, setNow] = useState(() => Date.now());
 
   const start = findInFlightStart(events);
+  const startId = start?.id;
 
   useEffect(() => {
-    if (!start) return;
+    if (!startId) return;
     const id = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(id);
-  }, [start?.id]);
+  }, [startId]);
 
   if (!start) return null;
   const startedAt = new Date(start.created_at).getTime();

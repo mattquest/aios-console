@@ -13,22 +13,32 @@ export default function AgentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const reload = useCallback(async () => {
+  // All state writes happen in promise callbacks, so the mount effect
+  // never sets state synchronously (initial state already shows loading).
+  const load = useCallback(
+    () =>
+      api
+        .listAgents()
+        .then((r) => {
+          setAgents(r.data);
+          setError(null);
+        })
+        .catch((e: unknown) => setError(toErrorMessage(e)))
+        .finally(() => setLoading(false)),
+    [],
+  );
+
+  // Event-handler path (dialog saves, deletes): bring the spinner back
+  // immediately before refetching.
+  const reload = useCallback(() => {
     setLoading(true);
     setError(null);
-    try {
-      const r = await api.listAgents();
-      setAgents(r.data);
-    } catch (e) {
-      setError(toErrorMessage(e));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    void load();
+  }, [load]);
 
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    void load();
+  }, [load]);
 
   return (
     <main className="flex-1 min-w-0 overflow-y-auto">
@@ -36,7 +46,7 @@ export default function AgentsPage() {
         <header className="flex items-end justify-between gap-4">
           <div className="space-y-3 min-w-0">
             <div className="flex items-center gap-2 text-pico text-muted-foreground">
-              <span className="text-signal">//</span>
+              <span className="text-signal">{"//"}</span>
               <span>resource/agents</span>
               <span className="text-muted-foreground/40">·</span>
               <span className="tabular-nums normal-case tracking-[0.12em]">

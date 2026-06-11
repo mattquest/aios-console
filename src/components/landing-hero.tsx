@@ -96,7 +96,7 @@ export function LandingHero() {
         >
           <div className="col-span-12 lg:col-span-8 space-y-4">
             <div className="flex items-center gap-2 text-pico text-muted-foreground/80">
-              <span className="text-signal">//</span>
+              <span className="text-signal">{"//"}</span>
               <span>mission_brief</span>
               <span className="text-muted-foreground/40">·</span>
               <span className="normal-case tracking-[0.12em]">
@@ -149,7 +149,7 @@ export function LandingHero() {
         {/* ── modules ─────────────────────────────────────────────── */}
         <section className="space-y-3">
           <div className="flex items-center gap-3 text-pico text-muted-foreground">
-            <span className="text-signal">//</span>
+            <span className="text-signal">{"//"}</span>
             <span>modules</span>
             <span className="flex-1 h-px bg-border/50" />
             <span className="tabular-nums normal-case tracking-[0.12em]">
@@ -187,7 +187,7 @@ export function LandingHero() {
         {/* ── boot sequence ───────────────────────────────────────── */}
         <section className="space-y-3">
           <div className="flex items-center gap-3 text-pico text-muted-foreground">
-            <span className="text-signal">//</span>
+            <span className="text-signal">{"//"}</span>
             <span>boot.sequence</span>
             <span className="flex-1 h-px bg-border/50" />
             <span className="tabular-nums normal-case tracking-[0.12em]">

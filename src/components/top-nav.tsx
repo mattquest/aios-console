@@ -15,8 +15,9 @@ export function TopNav() {
   const [health, setHealth] = useState<HealthResp>({ state: "probing" });
   // Build epoch is captured once per page load and rendered as a small
   // mono-uptime readout in the wordmark cluster — pure visual telemetry,
-  // not load-bearing.
-  const bootRef = useRef(Date.now());
+  // not load-bearing. Captured in the effect (not render) so render
+  // stays pure.
+  const bootRef = useRef<number | null>(null);
   const [uptime, setUptime] = useState("00:00");
 
   useEffect(() => {
@@ -48,8 +49,9 @@ export function TopNav() {
   }, []);
 
   useEffect(() => {
+    bootRef.current ??= Date.now();
     const tick = () => {
-      const sec = Math.floor((Date.now() - bootRef.current) / 1000);
+      const sec = Math.floor((Date.now() - (bootRef.current ?? Date.now())) / 1000);
       const m = Math.floor(sec / 60) % 60;
       const s = sec % 60;
       const h = Math.floor(sec / 3600);

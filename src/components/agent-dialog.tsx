@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
 import type { Agent } from "@/lib/types";
@@ -73,18 +73,19 @@ export function AgentDialog(props: AgentDialogProps) {
   const [error, setError] = useState<string | null>(null);
 
   // Re-sync form state when the dialog (re)opens — covers edits to agents
-  // that updated server-side after the row first rendered.
-  useEffect(() => {
-    if (!open || !initial) return;
-    setName(initial.name);
-    setModel(initial.model);
-    setSystem(initial.system);
-    setTools(new Set((initial.tools ?? []).map((t) => t.type)));
-    setError(null);
-    // initial is a stable object per AgentDialog instance; only the open
-    // toggle drives this effect.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  // that updated server-side after the row first rendered. Runs in the
+  // open-change event handler rather than an effect, so render stays
+  // free of cascading state writes.
+  const handleOpenChange = (next: boolean) => {
+    if (next && initial) {
+      setName(initial.name);
+      setModel(initial.model);
+      setSystem(initial.system);
+      setTools(new Set((initial.tools ?? []).map((t) => t.type)));
+      setError(null);
+    }
+    setOpen(next);
+  };
 
   const toggleTool = (t: string) =>
     setTools((s) => {
@@ -135,7 +136,7 @@ export function AgentDialog(props: AgentDialogProps) {
   const isCreate = props.mode === "create";
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
         render={
           isCreate ? (
