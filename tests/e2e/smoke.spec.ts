@@ -2,10 +2,10 @@ import { test, expect, Page, Route } from "@playwright/test";
 
 /**
  * End-to-end smoke: create a session, post a message, watch the SSE
- * stream land events, and confirm the inspector surfaces triage +
- * spans. The aios backend is mocked at the proxy boundary so this runs
- * without a live Postgres or worker — the contract we're testing is
- * "given these bytes from aios, the UI renders correctly."
+ * stream land events, and confirm the inspector surfaces the event log
+ * and spans. The aios backend is mocked at the proxy boundary so this
+ * runs without a live Postgres or worker — the contract we're testing
+ * is "given these bytes from aios, the UI renders correctly."
  */
 
 const AGENT_ID = "agent_01TEST";
@@ -43,7 +43,6 @@ async function installMocks(page: Page, fx: Fixture) {
             model: "anthropic/claude-sonnet-4-6",
             system: "",
             description: null,
-            triage: null,
           },
         ],
         has_more: false,
@@ -185,7 +184,7 @@ test("creating a session navigates to its page and streams events", async ({
         session_id: SESSION_ID,
         seq: 3,
         kind: "lifecycle",
-        data: { event: "triage_decision", decision: "respond", reason: "addressed", reacting_to: 1 },
+        data: { event: "stayed_silent", reason: "no new messages" },
         created_at: new Date().toISOString(),
       },
     },
@@ -216,6 +215,31 @@ test("creating a session navigates to its page and streams events", async ({
         created_at: new Date().toISOString(),
       },
     },
+    // A non-model span pair: every *_end carries a back-pointer named
+    // after its kind (step_start_id here). These used to render stuck
+    // at "in flight…" because only model_request_start_id was resolved.
+    {
+      event: "event",
+      data: {
+        id: "evt_06",
+        session_id: SESSION_ID,
+        seq: 6,
+        kind: "span",
+        data: { event: "step_start" },
+        created_at: new Date(Date.now() - 180).toISOString(),
+      },
+    },
+    {
+      event: "event",
+      data: {
+        id: "evt_07",
+        session_id: SESSION_ID,
+        seq: 7,
+        kind: "span",
+        data: { event: "step_end", step_start_id: "evt_06" },
+        created_at: new Date().toISOString(),
+      },
+    },
   ]);
 
   await installMocks(page, { sessions: [], events: [], sse });
@@ -239,13 +263,36 @@ test("creating a session navigates to its page and streams events", async ({
     "lifecycle",
   );
 
-  // Triage tab shows the respond verdict.
-  await page.getByRole("tab", { name: /triage/i }).click();
-  await expect(page.getByTestId(`triage-3`)).toContainText("respond");
-  await expect(page.getByTestId(`triage-3`)).toContainText("addressed");
-
-  // Spans tab shows the measured model call.
+  // Spans tab shows the measured model call, and the completed step
+  // span resolves to a duration instead of sticking at "in flight…".
   await page.getByRole("tab", { name: /spans/i }).click();
   await expect(page.getByText("model_request")).toBeVisible();
   await expect(page.getByText(/input_tokens/)).toBeVisible();
+  await expect(page.getByText("step", { exact: true })).toBeVisible();
+  await expect(page.getByText(/in flight/)).toHaveCount(0);
+});
+
+test("a missing session renders not-found, not an empty chat", async ({
+  page,
+}) => {
+  await installMocks(page, { sessions: [], events: [], sse: "" });
+
+  const GONE_ID = "sess_01DELETED";
+  await page.route(`**/api/aios/v1/sessions/${GONE_ID}*`, (route: Route) =>
+    route.fulfill({
+      status: 404,
+      contentType: "application/json",
+      body: JSON.stringify({ detail: "session not found" }),
+    }),
+  );
+  await page.route(`**/api/aios/sessions/${GONE_ID}/stream`, (route: Route) =>
+    route.fulfill({ status: 404, body: "" }),
+  );
+
+  await page.goto(`/sessions/${GONE_ID}`);
+
+  await expect(page.getByTestId("session-not-found")).toBeVisible();
+  await expect(page.getByTestId("session-not-found")).toContainText(GONE_ID);
+  // No composer — a stale link must not invite typing into the void.
+  await expect(page.getByTestId("composer-input")).toHaveCount(0);
 });

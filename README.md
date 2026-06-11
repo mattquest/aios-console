@@ -1,6 +1,6 @@
 # aios-console
 
-Dev console for [aios](https://github.com/eumemic/aios) — a chat UI that exposes the session event log, span timings, triage decisions, and context payloads as first-class inspector panels.
+Dev console for [aios](https://github.com/eumemic/aios) — a chat UI that exposes the session event log, span timings, and context payloads as first-class inspector panels.
 
 ## Quick start
 
@@ -34,13 +34,12 @@ Local OpenAI-compatible servers (Ollama, vLLM/MLX, LM Studio, llama.cpp) also co
 2. **Environments** → **+ new environment**. One named `default` is enough for most setups.
 3. **Sessions** → **+ new**. Pick the agent + environment you just created, optionally seed with a first message.
 
-Once you've got an agent and an environment, the session view streams token deltas from the model in real time and exposes the full event log / span timings / triage decisions / reconstructed payload in the right-hand inspector.
+Once you've got an agent and an environment, the session view streams token deltas from the model in real time and exposes the full event log / span timings / reconstructed payload in the right-hand inspector.
 
 ## What's in the inspector
 
 - **events** — every append to the session's event log, filterable by kind (message / lifecycle / span / interrupt) and a jsonb substring.
 - **spans** — model call pairs with duration and per-request token usage.
-- **triage** — `triage_decision` lifecycle events (empty unless the agent has a `triage` block configured on the backend).
 - **payload** — reconstructed chat-completions message list for the most recent model call. Approximates what aios sent LiteLLM; the authoritative dump is `AIOS_DUMP_CONTEXT` on the worker.
 
 ## Running the tests

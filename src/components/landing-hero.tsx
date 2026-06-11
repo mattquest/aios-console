@@ -111,9 +111,9 @@ export function LandingHero() {
               </span>
             </h1>
             <p className="max-w-2xl font-sans text-[13.5px] leading-[1.65] text-muted-foreground">
-              Every model call, every tool dispatch, every triage decision lands
-              in an append-only event log — rendered live in the inspector. No
-              hidden compaction. No magic.
+              Every model call, every tool dispatch, every lifecycle decision
+              lands in an append-only event log — rendered live in the
+              inspector. No hidden compaction. No magic.
             </p>
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <Link
@@ -132,7 +132,7 @@ export function LandingHero() {
                 environments
               </Link>
               <a
-                href="https://github.com/aios"
+                href="https://github.com/eumemic/aios"
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-2 px-2 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground/70 hover:text-foreground transition-colors"
@@ -162,7 +162,7 @@ export function LandingHero() {
               ns="tail.events"
               tone="signal"
               title="Append-only event log"
-              body="Every session is an append-only stream in Postgres. The inspector tails it over SSE — token deltas, span timings, triage verdicts — at sub-second latency."
+              body="Every session is an append-only stream in Postgres. The inspector tails it over SSE — token deltas, span timings, lifecycle events — at sub-second latency."
               delay={220}
             />
             <Module

@@ -18,7 +18,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "aios — agent runtime console",
   description:
-    "Session-oriented intelligence. Dev console for aios: live event log, span timings, triage decisions, reconstructed payloads — transparency as a first-class primitive.",
+    "Session-oriented intelligence. Dev console for aios: live event log, span timings, reconstructed payloads — transparency as a first-class primitive.",
 };
 
 export default function RootLayout({

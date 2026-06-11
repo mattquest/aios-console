@@ -1,12 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSessionStream } from "@/hooks/use-session-stream";
 import { Chat } from "@/components/chat";
 import { Composer } from "@/components/composer";
 import { Inspector } from "@/components/inspector";
 import { Button } from "@/components/ui/button";
-import { api } from "@/lib/client";
+import { api, ApiError } from "@/lib/client";
 import { deriveDisplayStatus, type AiosEvent, type DisplayStatus, type Session } from "@/lib/types";
 import { cn, toErrorMessage } from "@/lib/utils";
 
@@ -17,6 +18,7 @@ interface Props {
 export function SessionView({ sessionId }: Props) {
   const stream = useSessionStream(sessionId);
   const [session, setSession] = useState<Session | null>(null);
+  const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -24,9 +26,15 @@ export function SessionView({ sessionId }: Props) {
       try {
         const next = await api.getSession(sessionId);
         if (cancelled) return;
+        setNotFound(false);
         setSession((prev) => (sessionEqual(prev, next) ? prev : next));
-      } catch {
-        /* surfaced via stream error banner */
+      } catch (e) {
+        // A missing session must NOT render as a healthy empty chat —
+        // users with a stale link would type into the void.
+        if (!cancelled && e instanceof ApiError && e.status === 404) {
+          setNotFound(true);
+        }
+        /* other failures surface via the stream error banner */
       }
     };
     void load();
@@ -38,6 +46,32 @@ export function SessionView({ sessionId }: Props) {
   }, [sessionId]);
 
   const displayStatus = session ? deriveDisplayStatus(session) : null;
+
+  if (notFound) {
+    return (
+      <div
+        className="flex-1 flex items-center justify-center"
+        data-testid="session-not-found"
+      >
+        <div className="text-center space-y-3 max-w-md px-6">
+          <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-signal-alert">
+            [404] session not found
+          </div>
+          <p className="font-sans text-[13px] text-muted-foreground leading-relaxed">
+            No session exists with id{" "}
+            <code className="text-foreground/80 break-all">{sessionId}</code>.
+            It may have been deleted, or the link is stale.
+          </p>
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 rounded-sm border border-border px-3.5 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground hover:border-foreground/60 transition-colors"
+          >
+            ← back to sessions
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col min-w-0">

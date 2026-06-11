@@ -58,7 +58,6 @@ export interface Agent {
   system: string;
   tools?: ToolSpec[];
   description?: string | null;
-  triage?: { model: string; system: string } | null;
 }
 
 export interface AgentUpdate {

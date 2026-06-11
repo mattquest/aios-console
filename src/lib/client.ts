@@ -13,6 +13,16 @@ import type {
   Session,
 } from "@/lib/types";
 
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
   const resp = await fetch(`/api/aios${path}`, {
     ...init,
@@ -23,7 +33,7 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!resp.ok) {
     const body = await resp.text();
-    throw new Error(`${resp.status} ${resp.statusText}: ${body}`);
+    throw new ApiError(resp.status, `${resp.status} ${resp.statusText}: ${body}`);
   }
   // Tolerate empty bodies (204 No Content or Content-Length: 0) so callers
   // typed as `Promise<void>` (DELETE, interrupt, ...) don't trip JSON.parse.

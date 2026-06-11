@@ -151,12 +151,6 @@ function AgentRow({
           <div className="text-readout text-2xl tabular-nums text-foreground">
             v{agent.version}
           </div>
-          {agent.triage && (
-            <div className="inline-flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-wider text-signal border border-signal/40 px-1.5 py-0.5 rounded-sm">
-              <span className="size-1 rounded-full bg-signal" />
-              triage
-            </div>
-          )}
         </div>
       </div>
       {agent.system && (
