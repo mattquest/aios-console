@@ -64,6 +64,8 @@ pnpm start        # production server
 
 On Vercel the proxy routes stream SSE correctly on Fluid Compute (Node runtime). Set `AIOS_URL`, `AIOS_API_KEY`, and `CONSOLE_PASSWORD` in the Vercel env, and put network-level protection in front of `AIOS_URL` itself.
 
+For the backend's trust boundaries, defaults, and operator hardening checklist, see [aios SECURITY.md](https://github.com/eumemic/aios/blob/master/SECURITY.md) and [DATA-HANDLING.md](https://github.com/eumemic/aios/blob/master/docs/DATA-HANDLING.md).
+
 ## Architecture
 
 ```
