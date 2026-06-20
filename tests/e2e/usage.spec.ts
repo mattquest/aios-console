@@ -107,7 +107,7 @@ test("nav exposes 04 usage and the day tab renders totals, bars, and the footnot
   await page.goto("/");
 
   // "04 usage" in the top-nav idiom: numbered link.
-  const navLink = page.getByTestId("top-nav").getByRole("link", { name: /04\s*usage/ });
+  const navLink = page.getByTestId("top-nav").getByRole("link", { name: /05\s*usage/ });
   await expect(navLink).toBeVisible();
   await navLink.click();
   await expect(page).toHaveURL(/\/usage$/);

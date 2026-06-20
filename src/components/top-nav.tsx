@@ -36,9 +36,10 @@ export function TopNav() {
 
   const links: { href: string; label: string; num: string }[] = [
     { href: "/", label: "sessions", num: "01" },
-    { href: "/agents", label: "agents", num: "02" },
-    { href: "/environments", label: "environments", num: "03" },
-    { href: "/usage", label: "usage", num: "04" },
+    { href: "/ops", label: "ops", num: "02" },
+    { href: "/agents", label: "agents", num: "03" },
+    { href: "/environments", label: "environments", num: "04" },
+    { href: "/usage", label: "usage", num: "05" },
   ];
 
   const isActive = (href: string) =>

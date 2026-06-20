@@ -7,6 +7,7 @@ import { publishSessions } from "@/lib/session-store";
 import { deriveDisplayStatus, type DisplayStatus, type Session } from "@/lib/types";
 import { ErrorBanner } from "@/components/error-banner";
 import { NeedsAttention } from "@/components/needs-attention";
+import { OpsAttention } from "@/components/ops-attention";
 import { NewSessionDialog } from "@/components/new-session-dialog";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { PanelLeft } from "lucide-react";
@@ -107,6 +108,7 @@ function SessionListContent({
       </header>
       <div className="flex-1 overflow-y-auto">
         <NeedsAttention sessions={sessions} />
+        <OpsAttention />
         {loading && <RowPlaceholder text="loading" />}
         {error != null && (
           <ErrorBanner

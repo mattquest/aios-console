@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, type ReactNode } from "react";
 import type { AiosEvent, AwaitingToolCall, ToolCall } from "@/lib/types";
 import {
   Collapsible,
@@ -11,6 +11,14 @@ import { Button } from "@/components/ui/button";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Markdown } from "@/components/markdown";
+import {
+  channelLabel,
+  channelLabelFromSendResult,
+  outboundSendLabel,
+  parseMessageMetadata,
+  type ChannelLabel,
+  type ChannelVariant,
+} from "@/lib/channels";
 import {
   connectorSendText,
   contentParts,
@@ -273,6 +281,8 @@ function Hint({ kbd, label }: { kbd: string; label: string }) {
 
 const ROLE_LABEL: Record<string, string> = {
   user: "human",
+  human: "human",
+  signal: "signal",
   assistant: "model",
   system: "system",
   tool: "tool",
@@ -289,20 +299,79 @@ function formatTime(iso: string): string | null {
   });
 }
 
+function variantStyles(variant: ChannelVariant) {
+  switch (variant) {
+    case "signal-dm":
+      return {
+        gutter: "text-signal-info",
+        dot: "bg-signal-info",
+        banner:
+          "border-signal-info/55 bg-signal-info/10 text-signal-info shadow-[inset_3px_0_0_var(--color-signal-info)]",
+        shell: "border-signal-info/40 bg-signal-info/[0.06]",
+      };
+    case "signal-group":
+      return {
+        gutter: "text-signal-system",
+        dot: "bg-signal-system",
+        banner:
+          "border-signal-system/55 bg-signal-system/10 text-signal-system shadow-[inset_3px_0_0_var(--color-signal-system)]",
+        shell: "border-signal-system/40 bg-signal-system/[0.06]",
+      };
+    case "signal-other":
+      return {
+        gutter: "text-signal",
+        dot: "bg-signal",
+        banner:
+          "border-signal/55 bg-signal/10 text-signal shadow-[inset_3px_0_0_var(--color-signal)]",
+        shell: "border-signal/40 bg-signal/[0.06]",
+      };
+    case "outbound":
+      return {
+        gutter: "text-signal-warn",
+        dot: "bg-signal-warn",
+        banner:
+          "border-signal-warn/55 bg-signal-warn/10 text-signal-warn shadow-[inset_3px_0_0_var(--color-signal-warn)]",
+        shell: "border-signal-warn/40 bg-signal-warn/[0.06]",
+      };
+    case "console":
+    default:
+      return {
+        gutter: "text-muted-foreground/80",
+        dot: "bg-muted-foreground/60",
+        banner: "border-border/70 bg-muted/35 text-muted-foreground",
+        shell: "border-border/55 bg-card/35",
+      };
+  }
+}
+
 function RoleGutter({
   role,
   seq,
   at,
+  variant,
 }: {
   role: string;
   seq: number;
   at?: string;
+  variant?: ChannelVariant;
 }) {
   const time = at ? formatTime(at) : null;
+  const styles = variant ? variantStyles(variant) : null;
   return (
     <div className="pt-1 space-y-1">
-      <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground/80 flex items-baseline gap-2">
+      <div
+        className={cn(
+          "font-mono text-[10px] uppercase tracking-[0.18em] flex items-baseline gap-2",
+          styles?.gutter ?? "text-muted-foreground/80",
+        )}
+      >
         <span>{ROLE_LABEL[role] ?? role}</span>
+        {variant && variant !== "console" && (
+          <span
+            aria-hidden
+            className={cn("size-1.5 rounded-full shrink-0", styles?.dot)}
+          />
+        )}
         <span className="text-muted-foreground/40 tabular-nums">
           #{String(seq).padStart(3, "0")}
         </span>
@@ -320,6 +389,74 @@ function RoleGutter({
   );
 }
 
+function ChannelProvenance({ label }: { label: ChannelLabel }) {
+  const styles = variantStyles(label.variant);
+  const prominent = label.variant !== "console";
+  return (
+    <div
+      data-testid="channel-provenance"
+      data-variant={label.variant}
+      title={label.channel}
+      className={cn(
+        "rounded-sm border flex items-start gap-2.5 min-w-0",
+        prominent ? "px-3 py-2.5" : "px-2.5 py-1.5",
+        styles.banner,
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          "rounded-full shrink-0 mt-0.5",
+          prominent ? "size-2.5" : "size-1.5",
+          styles.dot,
+        )}
+      />
+      <div className="min-w-0 space-y-0.5">
+        <div
+          className={cn(
+            "font-mono uppercase tracking-[0.12em] leading-snug",
+            prominent
+              ? "text-[12px] sm:text-[13px] font-medium"
+              : "text-[10px] text-muted-foreground/90",
+          )}
+        >
+          {label.headline}
+        </div>
+        {prominent && (
+          <div className="font-mono text-[9px] uppercase tracking-[0.16em] opacity-75 flex items-center gap-1 flex-wrap">
+            <span>{label.source}</span>
+            <span className="opacity-50">/</span>
+            <span className="normal-case tracking-normal">{label.detail}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MessageShell({
+  variant,
+  children,
+}: {
+  variant: ChannelVariant;
+  children: ReactNode;
+}) {
+  const styles = variantStyles(variant);
+  const framed = variant !== "console";
+  if (!framed) return <div className="space-y-3 min-w-0">{children}</div>;
+  return (
+    <div
+      data-channel-shell={variant}
+      className={cn(
+        "rounded-sm border px-3 py-3 space-y-3 min-w-0",
+        styles.shell,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
 function MessageRow({ event }: { event: AiosEvent }) {
   const data = event.data as {
     role?: string;
@@ -327,6 +464,7 @@ function MessageRow({ event }: { event: AiosEvent }) {
     tool_calls?: ToolCall[];
     tool_call_id?: string;
     name?: string;
+    metadata?: unknown;
   };
   const role = data.role ?? "?";
 
@@ -348,15 +486,26 @@ function MessageRow({ event }: { event: AiosEvent }) {
   const parts = contentParts(data.content);
   const fullText = contentText(data.content);
   const monologue = isAssistant && isMonologue(fullText);
+  const inbound =
+    role === "user" ? channelLabel(parseMessageMetadata(data)) : null;
+
+  const inboundVariant = inbound?.variant;
 
   return (
     <div
       data-testid={`message-${role}`}
       data-seq={event.seq}
+      data-channel={inbound?.variant}
       className="grid grid-cols-[72px_1fr] gap-4"
     >
-      <RoleGutter role={role} seq={event.seq} at={event.created_at} />
-      <div className="space-y-3 min-w-0">
+      <RoleGutter
+        role={inbound?.source === "console" ? role : (inbound?.source ?? role)}
+        seq={event.seq}
+        at={event.created_at}
+        variant={inboundVariant}
+      />
+      <MessageShell variant={inboundVariant ?? "console"}>
+        {inbound && <ChannelProvenance label={inbound} />}
         {monologue ? (
           <MonologueDisclosure text={stripMonologue(fullText)} />
         ) : (
@@ -379,12 +528,16 @@ function MessageRow({ event }: { event: AiosEvent }) {
           )
         )}
         {sends.map(({ call, text }) => (
-          <ConnectorSend key={call.id} name={call.function.name} text={text} />
+          <ConnectorSend
+            key={call.id}
+            name={call.function.name}
+            text={text}
+          />
         ))}
         {plumbing.map((tc) => (
           <ToolCallCard key={tc.id} call={tc} />
         ))}
-      </div>
+      </MessageShell>
     </div>
   );
 }
@@ -421,14 +574,21 @@ function MonologueDisclosure({ text }: { text: string }) {
 
 /** A connector send (signal_send, telegram_send, …) — speech, not plumbing. */
 function ConnectorSend({ name, text }: { name: string; text: string }) {
+  const label = outboundSendLabel(name);
+  const styles = variantStyles(label.variant);
   return (
-    <div data-testid="connector-send" className="space-y-1 min-w-0">
+    <div
+      data-testid="connector-send"
+      data-variant={label.variant}
+      className={cn(
+        "rounded-sm border px-3 py-3 space-y-2 min-w-0",
+        styles.shell,
+      )}
+    >
+      <ChannelProvenance label={label} />
       <Markdown className="font-sans text-[15px] leading-relaxed text-foreground">
         {text}
       </Markdown>
-      <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground/50">
-        sent via {name}
-      </div>
     </div>
   );
 }
@@ -632,12 +792,43 @@ function ToolResultRow({ event }: { event: AiosEvent }) {
     is_error?: boolean;
   };
   const content = contentText(data.content);
+  const delivery = channelLabelFromSendResult(data.name, data.content);
   let preview: string;
   try {
     const parsed = JSON.parse(content);
     preview = JSON.stringify(parsed, null, 2);
   } catch {
     preview = content;
+  }
+
+  if (delivery && !data.is_error) {
+    const styles = variantStyles(delivery.variant);
+    return (
+      <div
+        data-testid="message-tool"
+        data-seq={event.seq}
+        data-channel={delivery.variant}
+        className="grid grid-cols-[72px_1fr] gap-4"
+      >
+        <RoleGutter
+          role="tool"
+          seq={event.seq}
+          at={event.created_at}
+          variant={delivery.variant}
+        />
+        <div
+          className={cn(
+            "rounded-sm border px-3 py-2.5 space-y-1.5 min-w-0",
+            styles.shell,
+          )}
+        >
+          <ChannelProvenance label={delivery} />
+          <span className="font-mono text-[10px] text-muted-foreground/80">
+            delivered via {data.name}
+          </span>
+        </div>
+      </div>
+    );
   }
 
   return (
