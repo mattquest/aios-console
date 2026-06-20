@@ -11,10 +11,20 @@ export interface MessageMetadata {
   sender_uuid?: string;
 }
 
+export type ChannelVariant =
+  | "signal-dm"
+  | "signal-group"
+  | "signal-other"
+  | "console"
+  | "outbound";
+
 export interface ChannelLabel {
   source: string;
   detail: string;
   channel?: string;
+  variant: ChannelVariant;
+  /** Short banner headline, e.g. "Signal DM from Matt" */
+  headline: string;
 }
 
 export function parseMessageMetadata(data: {
@@ -27,31 +37,51 @@ export function parseMessageMetadata(data: {
 
 export function channelLabel(meta: MessageMetadata | null): ChannelLabel {
   if (!meta?.channel) {
-    return { source: "console", detail: "web / api" };
+    return {
+      source: "console",
+      detail: "web / api",
+      variant: "console",
+      headline: "Console message",
+    };
   }
   const ch = meta.channel;
   if (ch.startsWith("signal/")) {
     if (meta.chat_type === "group") {
+      const name = meta.chat_name ?? "unnamed group";
       return {
         source: "signal",
-        detail: `group · ${meta.chat_name ?? "unnamed"}`,
+        detail: `group · ${name}`,
         channel: ch,
+        variant: "signal-group",
+        headline: `Signal group · ${name}`,
       };
     }
     if (meta.chat_type === "dm") {
+      const who = meta.sender_name ?? "unknown";
       return {
         source: "signal",
-        detail: `dm · ${meta.sender_name ?? "unknown"}`,
+        detail: `dm · ${who}`,
         channel: ch,
+        variant: "signal-dm",
+        headline: `Signal DM from ${who}`,
       };
     }
-    return { source: "signal", detail: meta.chat_type ?? "chat", channel: ch };
+    return {
+      source: "signal",
+      detail: meta.chat_type ?? "chat",
+      channel: ch,
+      variant: "signal-other",
+      headline: `Signal · ${meta.chat_type ?? "message"}`,
+    };
   }
   const connector = ch.split("/")[0] ?? "channel";
+  const detail = meta.chat_name ?? meta.chat_type ?? ch;
   return {
     source: connector,
-    detail: meta.chat_name ?? meta.chat_type ?? ch,
+    detail,
     channel: ch,
+    variant: "signal-other",
+    headline: `${connector} · ${detail}`,
   };
 }
 
@@ -73,10 +103,29 @@ export function channelLabelFromSendResult(
         source: "signal",
         detail: looksDm ? "dm" : "group",
         channel: ch,
+        variant: looksDm ? "signal-dm" : "signal-group",
+        headline: looksDm ? "Sent on Signal DM" : "Sent on Signal group",
       };
     }
-    return { source: ch.split("/")[0] ?? "channel", detail: "delivered", channel: ch };
+    const connector = ch.split("/")[0] ?? "channel";
+    return {
+      source: connector,
+      detail: "delivered",
+      channel: ch,
+      variant: "outbound",
+      headline: `Sent via ${connector}`,
+    };
   } catch {
     return null;
   }
+}
+
+export function outboundSendLabel(name: string): ChannelLabel {
+  const source = name.replace(/_send$/, "");
+  return {
+    source,
+    detail: "outbound",
+    variant: "outbound",
+    headline: `Outgoing · ${source}`,
+  };
 }
