@@ -62,7 +62,9 @@ test("connector send renders as a first-class assistant bubble", async ({
   await expect(bubble).toContainText("on my way");
   // Markdown renders (no raw asterisks).
   await expect(bubble.locator("strong")).toHaveText("seven");
-  await expect(bubble).toContainText("sent via signal_send");
+  await expect(bubble.getByTestId("channel-provenance")).toContainText(
+    "Outgoing · signal",
+  );
   // It must NOT also render as a collapsed invoke card.
   await expect(page.getByText("invoke")).toHaveCount(0);
   // Persisted messages carry a timestamp in the gutter.
