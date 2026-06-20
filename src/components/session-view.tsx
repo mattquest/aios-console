@@ -34,6 +34,7 @@ export function SessionView({ sessionId }: Props) {
   const [session, setSession] = useState<Session | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [agentName, setAgentName] = useState<string | null>(null);
+  const [agentModel, setAgentModel] = useState<string | null>(null);
   // Approval decisions already submitted — hide their cards immediately
   // instead of waiting for the next session poll to clear `awaiting`.
   const [decided, setDecided] = useState<Set<string>>(new Set());
@@ -81,7 +82,10 @@ export function SessionView({ sessionId }: Props) {
     api
       .getAgent(agentId)
       .then((a) => {
-        if (!cancelled) setAgentName(a.name);
+        if (!cancelled) {
+          setAgentName(a.name);
+          setAgentModel(a.model);
+        }
       })
       .catch(() => {
         /* name is cosmetic — the card falls back to "the assistant" */
@@ -144,6 +148,7 @@ export function SessionView({ sessionId }: Props) {
         displayStatus={displayStatus}
         connected={stream.connected}
         events={stream.events}
+        agentModel={agentModel}
       />
       <div className="flex-1 flex min-h-0">
         <div className="flex-1 flex flex-col min-w-0">
@@ -301,12 +306,14 @@ function SessionHeader({
   displayStatus,
   connected,
   events,
+  agentModel,
 }: {
   sessionId: string;
   session: Session | null;
   displayStatus: DisplayStatus | null;
   connected: boolean;
   events: AiosEvent[];
+  agentModel?: string | null;
 }) {
   const stats = useMemo(() => deriveStats(events), [events]);
 
@@ -318,14 +325,36 @@ function SessionHeader({
       <div className="px-3 sm:px-4 py-2.5 flex items-center gap-3 sm:gap-4">
         <MobileSessionsDrawer activeId={sessionId} />
 
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <span className="text-pico text-muted-foreground/70 shrink-0">
-            sid
-          </span>
-          <span className="text-muted-foreground/40 shrink-0">›</span>
-          <span className="font-mono text-[11px] text-foreground/90 truncate">
-            {session?.id ?? "…"}
-          </span>
+        <div className="flex flex-col min-w-0 flex-1 gap-0.5">
+          {session?.title && (
+            <span
+              data-testid="session-title"
+              className="font-sans text-[13px] text-foreground truncate leading-tight"
+            >
+              {session.title}
+            </span>
+          )}
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-pico text-muted-foreground/70 shrink-0">
+              sid
+            </span>
+            <span className="text-muted-foreground/40 shrink-0">›</span>
+            <span className="font-mono text-[10px] text-muted-foreground truncate">
+              {session?.id ?? "…"}
+            </span>
+            {agentModel && (
+              <>
+                <span className="text-muted-foreground/30 shrink-0">·</span>
+                <span
+                  data-testid="session-model"
+                  className="font-mono text-[10px] text-muted-foreground/80 truncate"
+                  title={agentModel}
+                >
+                  {agentModel.replace(/^openai\//, "")}
+                </span>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="h-4 w-px bg-border/60 shrink-0 hidden sm:block" />

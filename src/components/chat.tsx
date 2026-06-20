@@ -12,6 +12,12 @@ import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Markdown } from "@/components/markdown";
 import {
+  channelLabel,
+  channelLabelFromSendResult,
+  parseMessageMetadata,
+  type ChannelLabel,
+} from "@/lib/channels";
+import {
   connectorSendText,
   contentParts,
   contentText,
@@ -273,6 +279,8 @@ function Hint({ kbd, label }: { kbd: string; label: string }) {
 
 const ROLE_LABEL: Record<string, string> = {
   user: "human",
+  human: "human",
+  signal: "signal",
   assistant: "model",
   system: "system",
   tool: "tool",
@@ -320,6 +328,22 @@ function RoleGutter({
   );
 }
 
+function ChannelProvenance({ label }: { label: ChannelLabel }) {
+  return (
+    <div
+      data-testid="channel-provenance"
+      title={label.channel}
+      className="font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground/70 flex items-center gap-1.5"
+    >
+      <span className="text-signal-system">{label.source}</span>
+      <span className="text-muted-foreground/40">/</span>
+      <span className="normal-case tracking-normal text-muted-foreground">
+        {label.detail}
+      </span>
+    </div>
+  );
+}
+
 function MessageRow({ event }: { event: AiosEvent }) {
   const data = event.data as {
     role?: string;
@@ -327,6 +351,7 @@ function MessageRow({ event }: { event: AiosEvent }) {
     tool_calls?: ToolCall[];
     tool_call_id?: string;
     name?: string;
+    metadata?: unknown;
   };
   const role = data.role ?? "?";
 
@@ -348,6 +373,8 @@ function MessageRow({ event }: { event: AiosEvent }) {
   const parts = contentParts(data.content);
   const fullText = contentText(data.content);
   const monologue = isAssistant && isMonologue(fullText);
+  const inbound =
+    role === "user" ? channelLabel(parseMessageMetadata(data)) : null;
 
   return (
     <div
@@ -355,8 +382,13 @@ function MessageRow({ event }: { event: AiosEvent }) {
       data-seq={event.seq}
       className="grid grid-cols-[72px_1fr] gap-4"
     >
-      <RoleGutter role={role} seq={event.seq} at={event.created_at} />
+      <RoleGutter
+        role={inbound?.source === "console" ? role : inbound?.source ?? role}
+        seq={event.seq}
+        at={event.created_at}
+      />
       <div className="space-y-3 min-w-0">
+        {inbound && <ChannelProvenance label={inbound} />}
         {monologue ? (
           <MonologueDisclosure text={stripMonologue(fullText)} />
         ) : (
@@ -379,7 +411,11 @@ function MessageRow({ event }: { event: AiosEvent }) {
           )
         )}
         {sends.map(({ call, text }) => (
-          <ConnectorSend key={call.id} name={call.function.name} text={text} />
+          <ConnectorSend
+            key={call.id}
+            name={call.function.name}
+            text={text}
+          />
         ))}
         {plumbing.map((tc) => (
           <ToolCallCard key={tc.id} call={tc} />
@@ -423,12 +459,12 @@ function MonologueDisclosure({ text }: { text: string }) {
 function ConnectorSend({ name, text }: { name: string; text: string }) {
   return (
     <div data-testid="connector-send" className="space-y-1 min-w-0">
+      <ChannelProvenance
+        label={{ source: name.replace(/_send$/, ""), detail: "outbound" }}
+      />
       <Markdown className="font-sans text-[15px] leading-relaxed text-foreground">
         {text}
       </Markdown>
-      <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground/50">
-        sent via {name}
-      </div>
     </div>
   );
 }
@@ -632,12 +668,29 @@ function ToolResultRow({ event }: { event: AiosEvent }) {
     is_error?: boolean;
   };
   const content = contentText(data.content);
+  const delivery = channelLabelFromSendResult(data.name, data.content);
   let preview: string;
   try {
     const parsed = JSON.parse(content);
     preview = JSON.stringify(parsed, null, 2);
   } catch {
     preview = content;
+  }
+
+  if (delivery && !data.is_error) {
+    return (
+      <div
+        data-testid="message-tool"
+        data-seq={event.seq}
+        className="grid grid-cols-[72px_1fr] gap-4"
+      >
+        <RoleGutter role="tool" seq={event.seq} at={event.created_at} />
+        <div className="font-mono text-[10px] text-muted-foreground/80 space-y-1 min-w-0">
+          <ChannelProvenance label={delivery} />
+          <span className="text-signal/80">delivered via {data.name}</span>
+        </div>
+      </div>
+    );
   }
 
   return (
