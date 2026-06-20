@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -14,7 +14,6 @@ export default function LoginPage() {
 }
 
 function LoginForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +35,10 @@ function LoginForm() {
         return;
       }
       const from = params.get("from");
-      router.replace(from && from.startsWith("/") ? from : "/");
+      // Hard navigation: the session cookie is set on this fetch response and
+      // client-side router.replace can fail to pick it up before the auth gate
+      // runs, leaving the operator stuck on /login despite a 200.
+      window.location.href = from && from.startsWith("/") ? from : "/";
     } catch {
       setError("login failed — is the console server reachable?");
     } finally {
