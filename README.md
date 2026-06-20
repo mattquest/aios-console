@@ -1,6 +1,6 @@
 # aios-console
 
-Dev console for [aios](https://github.com/eumemic/aios) — a chat UI that exposes the session event log, span timings, triage decisions, and context payloads as first-class inspector panels.
+Dev console for [aios](https://github.com/eumemic/aios) — a chat UI that exposes the session event log, span timings, and context payloads as first-class inspector panels.
 
 ## Quick start
 
@@ -34,13 +34,12 @@ Local OpenAI-compatible servers (Ollama, vLLM/MLX, LM Studio, llama.cpp) also co
 2. **Environments** → **+ new environment**. One named `default` is enough for most setups.
 3. **Sessions** → **+ new**. Pick the agent + environment you just created, optionally seed with a first message.
 
-Once you've got an agent and an environment, the session view streams token deltas from the model in real time and exposes the full event log / span timings / triage decisions / reconstructed payload in the right-hand inspector.
+Once you've got an agent and an environment, the session view streams token deltas from the model in real time and exposes the full event log / span timings / reconstructed payload in the right-hand inspector.
 
 ## What's in the inspector
 
 - **events** — every append to the session's event log, filterable by kind (message / lifecycle / span / interrupt) and a jsonb substring.
 - **spans** — model call pairs with duration and per-request token usage.
-- **triage** — `triage_decision` lifecycle events (empty unless the agent has a `triage` block configured on the backend).
 - **payload** — reconstructed chat-completions message list for the most recent model call. Approximates what aios sent LiteLLM; the authoritative dump is `AIOS_DUMP_CONTEXT` on the worker.
 
 ## Running the tests
@@ -61,7 +60,11 @@ pnpm build        # production bundle
 pnpm start        # production server
 ```
 
-On Vercel the proxy routes stream SSE correctly on Fluid Compute (Node runtime). Set `AIOS_URL` and `AIOS_API_KEY` in the Vercel env. For production, put a network-level protection in front of `AIOS_URL` — the console proxy doesn't add auth beyond the bearer key itself.
+`pnpm start` binds **127.0.0.1 only** — the console wields the full-privilege `AIOS_API_KEY` on every proxied request, so it must never sit on an open interface unauthenticated. To use it from other machines, set `CONSOLE_PASSWORD` in the env (all pages and `/api/aios/*` then require login at `/login`) and run `pnpm start:exposed` behind TLS (reverse proxy) or a VPN like Tailscale.
+
+On Vercel the proxy routes stream SSE correctly on Fluid Compute (Node runtime). Set `AIOS_URL`, `AIOS_API_KEY`, and `CONSOLE_PASSWORD` in the Vercel env, and put network-level protection in front of `AIOS_URL` itself.
+
+For the backend's trust boundaries, defaults, and operator hardening checklist, see [aios SECURITY.md](https://github.com/eumemic/aios/blob/master/SECURITY.md) and [DATA-HANDLING.md](https://github.com/eumemic/aios/blob/master/docs/DATA-HANDLING.md).
 
 ## Architecture
 

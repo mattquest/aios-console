@@ -40,6 +40,10 @@ export default defineConfig({
       // nobody'll be listening on in a test run.
       AIOS_URL: "http://127.0.0.1:49152",
       AIOS_API_KEY: "test-key",
+      // The operator login gate reads CONSOLE_PASSWORD from .env.local;
+      // an explicitly-set empty var wins over .env.local and turns the
+      // gate off. These tests cover the session UI, not auth.
+      CONSOLE_PASSWORD: "",
     },
   },
 });

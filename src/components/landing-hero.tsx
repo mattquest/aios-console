@@ -96,7 +96,7 @@ export function LandingHero() {
         >
           <div className="col-span-12 lg:col-span-8 space-y-4">
             <div className="flex items-center gap-2 text-pico text-muted-foreground/80">
-              <span className="text-signal">//</span>
+              <span className="text-signal">{"//"}</span>
               <span>mission_brief</span>
               <span className="text-muted-foreground/40">·</span>
               <span className="normal-case tracking-[0.12em]">
@@ -111,9 +111,9 @@ export function LandingHero() {
               </span>
             </h1>
             <p className="max-w-2xl font-sans text-[13.5px] leading-[1.65] text-muted-foreground">
-              Every model call, every tool dispatch, every triage decision lands
-              in an append-only event log — rendered live in the inspector. No
-              hidden compaction. No magic.
+              Every model call, every tool dispatch, every lifecycle decision
+              lands in an append-only event log — rendered live in the
+              inspector. No hidden compaction. No magic.
             </p>
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <Link
@@ -132,7 +132,7 @@ export function LandingHero() {
                 environments
               </Link>
               <a
-                href="https://github.com/aios"
+                href="https://github.com/eumemic/aios"
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-2 px-2 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground/70 hover:text-foreground transition-colors"
@@ -149,7 +149,7 @@ export function LandingHero() {
         {/* ── modules ─────────────────────────────────────────────── */}
         <section className="space-y-3">
           <div className="flex items-center gap-3 text-pico text-muted-foreground">
-            <span className="text-signal">//</span>
+            <span className="text-signal">{"//"}</span>
             <span>modules</span>
             <span className="flex-1 h-px bg-border/50" />
             <span className="tabular-nums normal-case tracking-[0.12em]">
@@ -162,7 +162,7 @@ export function LandingHero() {
               ns="tail.events"
               tone="signal"
               title="Append-only event log"
-              body="Every session is an append-only stream in Postgres. The inspector tails it over SSE — token deltas, span timings, triage verdicts — at sub-second latency."
+              body="Every session is an append-only stream in Postgres. The inspector tails it over SSE — token deltas, span timings, lifecycle events — at sub-second latency."
               delay={220}
             />
             <Module
@@ -187,7 +187,7 @@ export function LandingHero() {
         {/* ── boot sequence ───────────────────────────────────────── */}
         <section className="space-y-3">
           <div className="flex items-center gap-3 text-pico text-muted-foreground">
-            <span className="text-signal">//</span>
+            <span className="text-signal">{"//"}</span>
             <span>boot.sequence</span>
             <span className="flex-1 h-px bg-border/50" />
             <span className="tabular-nums normal-case tracking-[0.12em]">

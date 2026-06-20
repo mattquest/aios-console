@@ -2,54 +2,24 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { cn, toErrorMessage } from "@/lib/utils";
-
-type HealthResp =
-  | { state: "probing" }
-  | { state: "ok"; latencyMs: number }
-  | { state: "error"; error: string };
+import { Fragment, useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
+import { useSystemHealth, type SystemHealth } from "@/hooks/use-system-health";
 
 export function TopNav() {
   const pathname = usePathname();
-  const [health, setHealth] = useState<HealthResp>({ state: "probing" });
+  const health = useSystemHealth();
   // Build epoch is captured once per page load and rendered as a small
   // mono-uptime readout in the wordmark cluster — pure visual telemetry,
-  // not load-bearing.
-  const bootRef = useRef(Date.now());
+  // not load-bearing. Captured in the effect (not render) so render
+  // stays pure.
+  const bootRef = useRef<number | null>(null);
   const [uptime, setUptime] = useState("00:00");
 
   useEffect(() => {
-    let cancelled = false;
-    const probe = async () => {
-      const t0 = performance.now();
-      try {
-        const r = await fetch("/api/aios/v1/agents?limit=1", {
-          cache: "no-store",
-        });
-        const dt = Math.round(performance.now() - t0);
-        if (!cancelled) {
-          setHealth(
-            r.ok
-              ? { state: "ok", latencyMs: dt }
-              : { state: "error", error: `${r.status} ${r.statusText}` },
-          );
-        }
-      } catch (e) {
-        if (!cancelled) setHealth({ state: "error", error: toErrorMessage(e) });
-      }
-    };
-    probe();
-    const id = setInterval(probe, 10_000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, []);
-
-  useEffect(() => {
+    bootRef.current ??= Date.now();
     const tick = () => {
-      const sec = Math.floor((Date.now() - bootRef.current) / 1000);
+      const sec = Math.floor((Date.now() - (bootRef.current ?? Date.now())) / 1000);
       const m = Math.floor(sec / 60) % 60;
       const s = sec % 60;
       const h = Math.floor(sec / 3600);
@@ -66,8 +36,10 @@ export function TopNav() {
 
   const links: { href: string; label: string; num: string }[] = [
     { href: "/", label: "sessions", num: "01" },
-    { href: "/agents", label: "agents", num: "02" },
-    { href: "/environments", label: "environments", num: "03" },
+    { href: "/ops", label: "ops", num: "02" },
+    { href: "/agents", label: "agents", num: "03" },
+    { href: "/environments", label: "environments", num: "04" },
+    { href: "/usage", label: "usage", num: "05" },
   ];
 
   const isActive = (href: string) =>
@@ -125,61 +97,138 @@ export function TopNav() {
         })}
       </div>
 
-      <HealthIndicator health={health} />
+      <HealthStrip health={health} />
     </nav>
   );
 }
 
-function HealthIndicator({ health }: { health: HealthResp }) {
-  const styles = {
-    probing: {
-      text: "text-muted-foreground",
-      dot: "bg-signal-warn animate-signal",
-      label: "probing",
-    },
-    ok: {
-      text: "text-muted-foreground",
-      dot: "bg-signal animate-signal",
-      label: "online",
-    },
-    error: {
-      text: "text-signal-alert",
-      dot: "bg-signal-alert animate-signal",
-      label: "offline",
-    },
-  }[health.state];
-
-  // Right-edge readout: dot · status · vertical hairline · latency · /probe
+function HealthStrip({ health }: { health: SystemHealth }) {
+  const apiState =
+    health.phase === "probing" ? "probing" : health.api.up ? "up" : "down";
   // The latency cell stays present even while probing/offline so the column
   // doesn't reflow on every tick; we just mute the value.
   const latency =
-    health.state === "ok"
+    health.latencyMs !== null
       ? `${health.latencyMs}ms`
-      : health.state === "probing"
+      : health.phase === "probing"
         ? "—ms"
         : "n/a";
-  const latencyClass =
-    health.state === "ok" ? "text-foreground/80" : "text-muted-foreground/40";
 
   return (
     <div
       data-testid="aios-health"
-      data-state={health.state}
-      className={cn(
-        "ml-auto flex items-center gap-2.5 font-mono text-[10px] tracking-[0.15em] uppercase tabular-nums",
-        styles.text,
-      )}
-      title={health.state === "error" ? health.error : styles.label}
+      data-state={health.phase}
+      className="ml-auto flex items-center gap-2.5 font-mono text-[10px] tracking-[0.15em] uppercase tabular-nums"
     >
-      <span className={cn("size-1.5 rounded-full", styles.dot)} />
-      <span>aios/{styles.label}</span>
-      <span className="h-3 w-px bg-border/60" />
-      <span className={cn("normal-case tracking-normal", latencyClass)}>
-        {latency}
-      </span>
-      <span className="text-muted-foreground/40 normal-case tracking-normal">
-        /probe
-      </span>
+      <HealthCell
+        cellKey="api"
+        label="api"
+        state={apiState}
+        downSince={health.api.downSince}
+        now={health.checkedAt}
+        detail={latency}
+        detailMuted={apiState !== "up"}
+      />
+      {health.worker && (
+        <>
+          <span aria-hidden className="h-3 w-px bg-border/60" />
+          <HealthCell
+            cellKey="wrk"
+            label="wrk"
+            state={health.worker.up ? "up" : "down"}
+            downSince={health.worker.downSince}
+            now={health.checkedAt}
+          />
+        </>
+      )}
+      {(health.connections ?? []).map((c) => (
+        <Fragment key={c.id}>
+          <span aria-hidden className="h-3 w-px bg-border/60" />
+          <HealthCell
+            cellKey={c.connector}
+            label={c.connector}
+            state={c.up ? "up" : "down"}
+            downSince={c.downSince}
+            now={health.checkedAt}
+          />
+        </Fragment>
+      ))}
     </div>
   );
+}
+
+function HealthCell({
+  cellKey,
+  label,
+  state,
+  downSince,
+  now,
+  detail,
+  detailMuted,
+}: {
+  cellKey: string;
+  label: string;
+  state: "probing" | "up" | "down";
+  downSince: number | null;
+  now: number | null;
+  detail?: string;
+  detailMuted?: boolean;
+}) {
+  const styles = {
+    probing: {
+      text: "text-muted-foreground",
+      dot: "bg-signal-warn animate-signal",
+      word: "probing",
+    },
+    up: {
+      text: "text-muted-foreground",
+      dot: "bg-signal animate-signal",
+      word: "online",
+    },
+    down: {
+      text: "text-signal-alert",
+      dot: "bg-signal-alert animate-signal",
+      word: "down",
+    },
+  }[state];
+  // "down 4m" is anchored to the poller's last probe time, not Date.now(),
+  // so render stays pure; the 10s poll cadence keeps it fresh enough.
+  const isDown = state === "down" && downSince !== null;
+  const downFor = isDown ? formatDownFor((now ?? downSince) - downSince) : null;
+
+  return (
+    <span
+      data-testid={`health-cell-${cellKey}`}
+      data-state={state}
+      className={cn("flex items-center gap-1.5", styles.text)}
+      title={isDown ? new Date(downSince).toISOString() : `${label} ${styles.word}`}
+    >
+      {/* Decorative — the "{label}/{word}" text beside it carries the state. */}
+      <span aria-hidden className={cn("size-1.5 rounded-full", styles.dot)} />
+      <span>
+        {label}/{styles.word}
+        {downFor ? ` ${downFor}` : ""}
+      </span>
+      {detail !== undefined && (
+        <span
+          className={cn(
+            "normal-case tracking-normal",
+            detailMuted ? "text-muted-foreground/40" : "text-foreground/80",
+          )}
+        >
+          {detail}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function formatDownFor(ms: number): string {
+  const sec = Math.max(0, Math.floor(ms / 1000));
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h`;
+  return `${Math.floor(hr / 24)}d`;
 }

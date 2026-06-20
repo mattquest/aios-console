@@ -4,29 +4,42 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/client";
 import type { Agent } from "@/lib/types";
 import { toErrorMessage } from "@/lib/utils";
-import { NewAgentDialog } from "@/components/new-agent-dialog";
+import { AgentDialog } from "@/components/agent-dialog";
+import { ErrorBanner } from "@/components/error-banner";
+import { Button } from "@/components/ui/button";
+import { Trash2 } from "lucide-react";
 
 export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
 
-  const reload = useCallback(async () => {
+  // All state writes happen in promise callbacks, so the mount effect
+  // never sets state synchronously (initial state already shows loading).
+  const load = useCallback(
+    () =>
+      api
+        .listAgents()
+        .then((r) => {
+          setAgents(r.data);
+          setError(null);
+        })
+        .catch((e: unknown) => setError(e))
+        .finally(() => setLoading(false)),
+    [],
+  );
+
+  // Event-handler path (dialog saves, deletes): bring the spinner back
+  // immediately before refetching.
+  const reload = useCallback(() => {
     setLoading(true);
     setError(null);
-    try {
-      const r = await api.listAgents();
-      setAgents(r.data);
-    } catch (e) {
-      setError(toErrorMessage(e));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    void load();
+  }, [load]);
 
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    void load();
+  }, [load]);
 
   return (
     <main className="flex-1 min-w-0 overflow-y-auto">
@@ -34,7 +47,7 @@ export default function AgentsPage() {
         <header className="flex items-end justify-between gap-4">
           <div className="space-y-3 min-w-0">
             <div className="flex items-center gap-2 text-pico text-muted-foreground">
-              <span className="text-signal">//</span>
+              <span className="text-signal">{"//"}</span>
               <span>resource/agents</span>
               <span className="text-muted-foreground/40">·</span>
               <span className="tabular-nums normal-case tracking-[0.12em]">
@@ -54,20 +67,14 @@ export default function AgentsPage() {
               or float on latest.
             </p>
           </div>
-          <NewAgentDialog onCreated={reload} />
+          <AgentDialog mode="create" onSaved={reload} />
         </header>
 
         <div className="divider-h" />
 
         {loading && <BlockState label="loading" />}
-        {error && (
-          <div
-            data-testid="agents-error"
-            className="border border-signal-alert/40 bg-signal-alert/5 rounded-sm px-4 py-3 font-mono text-[11px] text-signal-alert break-all"
-          >
-            <span className="bracket-label">fault</span>
-            {error}
-          </div>
+        {error != null && (
+          <ErrorBanner error={error} onRetry={reload} testId="agents-error" />
         )}
         {!loading && !error && agents.length === 0 && (
           <EmptyAgents />
@@ -75,7 +82,12 @@ export default function AgentsPage() {
         {!loading && !error && agents.length > 0 && (
           <div className="space-y-3" data-testid="agents-list">
             {agents.map((a, i) => (
-              <AgentRow key={a.id} agent={a} index={i} />
+              <AgentRow
+                key={a.id}
+                agent={a}
+                index={i}
+                onChanged={reload}
+              />
             ))}
           </div>
         )}
@@ -84,7 +96,33 @@ export default function AgentsPage() {
   );
 }
 
-function AgentRow({ agent, index }: { agent: Agent; index: number }) {
+function AgentRow({
+  agent,
+  index,
+  onChanged,
+}: {
+  agent: Agent;
+  index: number;
+  onChanged: () => void;
+}) {
+  const [deleting, setDeleting] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const doDelete = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await api.deleteAgent(agent.id);
+      onChanged();
+    } catch (e) {
+      setDeleteError(toErrorMessage(e));
+      setConfirming(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div
       className="group border border-border/60 rounded-sm bg-card/30 hover:bg-card/60 hover:border-signal/40 transition-colors p-5"
@@ -118,12 +156,6 @@ function AgentRow({ agent, index }: { agent: Agent; index: number }) {
           <div className="text-readout text-2xl tabular-nums text-foreground">
             v{agent.version}
           </div>
-          {agent.triage && (
-            <div className="inline-flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-wider text-signal border border-signal/40 px-1.5 py-0.5 rounded-sm">
-              <span className="size-1 rounded-full bg-signal" />
-              triage
-            </div>
-          )}
         </div>
       </div>
       {agent.system && (
@@ -133,6 +165,55 @@ function AgentRow({ agent, index }: { agent: Agent; index: number }) {
             {agent.system}
           </p>
         </>
+      )}
+
+      <div className="divider-h my-4" />
+      <div className="flex items-center justify-end gap-1">
+        <AgentDialog mode="edit" agent={agent} onSaved={onChanged} />
+        {confirming ? (
+          <div className="flex items-center gap-1.5 font-mono text-[10px]">
+            <span className="text-muted-foreground uppercase">
+              delete · sessions on v{agent.version} keep working
+            </span>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={deleting}
+              onClick={() => setConfirming(false)}
+              className="h-7 font-mono text-[10px] uppercase"
+              data-testid={`cancel-delete-${agent.id}`}
+            >
+              cancel
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={deleting}
+              onClick={doDelete}
+              className="h-7 font-mono text-[10px] uppercase"
+              data-testid={`confirm-delete-${agent.id}`}
+            >
+              {deleting ? "…" : "confirm"}
+            </Button>
+          </div>
+        ) : (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setConfirming(true)}
+            className="h-7 font-mono text-[10px] uppercase text-muted-foreground hover:text-destructive"
+            data-testid={`delete-agent-${agent.id}`}
+            aria-label={`Delete agent ${agent.name}`}
+          >
+            <Trash2 className="size-3" />
+            delete
+          </Button>
+        )}
+      </div>
+      {deleteError && (
+        <div className="mt-2 text-[11px] font-mono text-destructive break-all">
+          {deleteError}
+        </div>
       )}
     </div>
   );

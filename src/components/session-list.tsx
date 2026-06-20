@@ -3,18 +3,70 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/client";
-import type { Session, SessionStatus } from "@/lib/types";
+import { publishSessions } from "@/lib/session-store";
+import { deriveDisplayStatus, type DisplayStatus, type Session } from "@/lib/types";
+import { ErrorBanner } from "@/components/error-banner";
+import { NeedsAttention } from "@/components/needs-attention";
+import { OpsAttention } from "@/components/ops-attention";
 import { NewSessionDialog } from "@/components/new-session-dialog";
-import { cn, toErrorMessage } from "@/lib/utils";
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { PanelLeft } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Props {
   activeId?: string;
 }
 
+/** Desktop rail — hidden on small screens, where the drawer takes over. */
 export function SessionList({ activeId }: Props) {
+  return (
+    <aside
+      data-testid="session-list"
+      className="w-[260px] shrink-0 border-r border-border/70 hidden md:flex flex-col bg-sidebar/40"
+    >
+      <SessionListContent activeId={activeId} />
+    </aside>
+  );
+}
+
+/**
+ * Small-screen drawer holding the same session list. Controlled so a
+ * navigation tap closes it instead of covering the destination.
+ */
+export function MobileSessionsDrawer({ activeId }: Props) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger
+        data-testid="sessions-drawer-trigger"
+        className="md:hidden inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground border border-border/60 rounded-sm px-2 py-1 transition-colors"
+      >
+        <PanelLeft className="size-3" />
+        <span>sessions</span>
+      </SheetTrigger>
+      <SheetContent
+        side="left"
+        className="w-[85vw] max-w-[320px] p-0 gap-0 flex flex-col bg-sidebar"
+        data-testid="sessions-drawer"
+        showCloseButton={false}
+      >
+        <SheetTitle className="sr-only">sessions</SheetTitle>
+        <SessionListContent
+          activeId={activeId}
+          onNavigate={() => setOpen(false)}
+        />
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function SessionListContent({
+  activeId,
+  onNavigate,
+}: Props & { onNavigate?: () => void }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -24,9 +76,11 @@ export function SessionList({ activeId }: Props) {
         if (!cancelled) {
           setSessions(resp.data);
           setError(null);
+          // Feed the ⌘K palette's jump-to-session list off this poll.
+          publishSessions(resp.data);
         }
       } catch (e) {
-        if (!cancelled) setError(toErrorMessage(e));
+        if (!cancelled) setError(e);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -40,10 +94,7 @@ export function SessionList({ activeId }: Props) {
   }, []);
 
   return (
-    <aside
-      data-testid="session-list"
-      className="w-[260px] shrink-0 border-r border-border/70 flex flex-col bg-sidebar/40"
-    >
+    <>
       <header className="px-4 py-3 flex items-center justify-between border-b border-border/60">
         <div className="flex items-center gap-2">
           <span className="text-hairline text-muted-foreground">sessions</span>
@@ -56,12 +107,15 @@ export function SessionList({ activeId }: Props) {
         <NewSessionDialog />
       </header>
       <div className="flex-1 overflow-y-auto">
+        <NeedsAttention sessions={sessions} />
+        <OpsAttention />
         {loading && <RowPlaceholder text="loading" />}
-        {error && (
-          <div className="px-4 py-3 font-mono text-[10px] text-signal-alert break-all">
-            <span className="bracket-label">fault</span>
-            {error}
-          </div>
+        {error != null && (
+          <ErrorBanner
+            error={error}
+            className="m-2"
+            testId="session-list-error"
+          />
         )}
         {!loading && !error && sessions.length === 0 && (
           <div className="px-4 py-6 space-y-2">
@@ -79,6 +133,7 @@ export function SessionList({ activeId }: Props) {
             <li key={s.id}>
               <Link
                 href={`/sessions/${s.id}`}
+                onClick={onNavigate}
                 className={cn(
                   "group relative block px-4 py-2.5 border-b border-border/30 transition-colors",
                   activeId === s.id
@@ -96,9 +151,12 @@ export function SessionList({ activeId }: Props) {
                   <span className="font-mono text-[11px] truncate text-foreground/90 flex-1">
                     {s.title || s.id.slice(0, 16) + "…"}
                   </span>
-                  <StatusDot status={s.status} />
+                  <StatusDot session={s} />
                 </div>
-                <div className="font-mono text-[9px] text-muted-foreground/60 truncate mt-1 pl-6">
+                <div
+                  title={s.id}
+                  className="font-mono text-[10px] text-muted-foreground/60 truncate mt-1 pl-6"
+                >
                   {s.id}
                 </div>
               </Link>
@@ -106,7 +164,7 @@ export function SessionList({ activeId }: Props) {
           ))}
         </ul>
       </div>
-    </aside>
+    </>
   );
 }
 
@@ -118,21 +176,25 @@ function RowPlaceholder({ text }: { text: string }) {
   );
 }
 
-const STATUS_COLOR: Record<SessionStatus, string> = {
+const STATUS_COLOR: Record<DisplayStatus, string> = {
   idle: "bg-muted-foreground/40",
-  running: "bg-signal",
-  waiting: "bg-signal-warn",
-  rescheduling: "bg-signal-warn",
-  archived: "bg-muted-foreground/20",
+  active: "bg-signal",
+  "needs you": "bg-signal-warn",
+  retrying: "bg-signal-warn",
+  errored: "bg-signal-alert",
 };
 
-function StatusDot({ status }: { status: SessionStatus }) {
+function StatusDot({ session }: { session: Session }) {
+  const status = deriveDisplayStatus(session);
   return (
     <span
+      // The dot is the row's only status carrier — name it for AT.
+      role="img"
+      aria-label={status}
       className={cn(
         "size-1.5 rounded-full shrink-0",
         STATUS_COLOR[status] ?? "bg-muted-foreground/40",
-        status === "running" && "animate-signal",
+        status === "active" && "animate-signal",
       )}
       title={status}
     />

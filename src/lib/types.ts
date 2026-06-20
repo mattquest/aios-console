@@ -6,12 +6,18 @@
  * We mirror that here and narrow at read sites.
  */
 
-export type SessionStatus =
-  | "idle"
-  | "running"
-  | "waiting"
-  | "rescheduling"
-  | "archived";
+/**
+ * Mirror of the backend's derived SessionStatus — exactly {active, idle}.
+ * Everything richer (errored, retrying, waiting-on-you) is derived
+ * client-side from ``stop_reason`` + ``awaiting``; see deriveDisplayStatus.
+ */
+export type SessionStatus = "active" | "idle";
+
+export interface AwaitingToolCall {
+  tool_call_id: string;
+  name: string;
+  kind: "builtin" | "mcp" | "custom";
+}
 
 export interface Session {
   id: string;
@@ -19,10 +25,29 @@ export interface Session {
   agent_version: number | null;
   status: SessionStatus;
   stop_reason?: Record<string, unknown> | null;
+  awaiting?: AwaitingToolCall[];
   title?: string | null;
   focal_channel?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * What the UI should say about a session right now. Derived, in priority
+ * order: terminal error > waiting on the operator > retrying > activity.
+ */
+export type DisplayStatus = "errored" | "needs you" | "retrying" | "active" | "idle";
+
+export function deriveDisplayStatus(session: Session): DisplayStatus {
+  const stop = (session.stop_reason as { type?: string } | null)?.type;
+  if (stop === "error") return "errored";
+  if ((session.awaiting?.length ?? 0) > 0) return "needs you";
+  if (stop === "rescheduling") return "retrying";
+  return session.status;
+}
+
+export interface ToolSpec {
+  type: string;
 }
 
 export interface Agent {
@@ -31,13 +56,42 @@ export interface Agent {
   name: string;
   model: string;
   system: string;
+  tools?: ToolSpec[];
   description?: string | null;
-  triage?: { model: string; system: string } | null;
+}
+
+export interface AgentUpdate {
+  version: number;
+  name?: string;
+  model?: string;
+  system?: string;
+  tools?: ToolSpec[];
 }
 
 export interface Environment {
   id: string;
   name: string;
+}
+
+/** One connector heartbeat as reported by ``GET /v1/health/ready``. */
+export interface HealthConnection {
+  id: string;
+  connector: string;
+  external_account_id: string | null;
+  alive: boolean;
+  last_heartbeat_at: string | null;
+}
+
+/**
+ * Payload of ``GET /v1/health/ready``. The backend serves the same shape
+ * with HTTP 503 when the db is unreachable or the worker is stale, and
+ * HTTP 200 otherwise — dead connections alone never cause a 503.
+ */
+export interface HealthReady {
+  status: "ready" | "degraded";
+  db: boolean;
+  worker: { alive: boolean; last_heartbeat: string | null };
+  connections: HealthConnection[];
 }
 
 export type EventKind = "message" | "lifecycle" | "span" | "interrupt";
@@ -60,5 +114,34 @@ export interface ToolCall {
 export interface ListResponse<T> {
   data: T[];
   has_more: boolean;
-  next_after: string | null;
+  next_cursor: string | null;
+}
+
+export type UsageGranularity = "day" | "session" | "model";
+
+/**
+ * One bucket from ``GET /v1/usage``. ``key`` is a UTC date (YYYY-MM-DD),
+ * a session id, or a model string depending on granularity.
+ *
+ * Cost honesty: ``cost_usd_known`` sums only the requests whose cost the
+ * provider actually reported; ``cost_usd_estimated_null_requests`` counts
+ * the requests with no cost data — they are never priced client-side.
+ */
+export interface UsageRow {
+  key: string;
+  session_title: string | null;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_creation_tokens: number;
+  requests: number;
+  cost_usd_known: number;
+  cost_usd_estimated_null_requests: number;
+}
+
+export interface UsageReport {
+  granularity: UsageGranularity;
+  since: string | null;
+  until: string | null;
+  rows: UsageRow[];
 }

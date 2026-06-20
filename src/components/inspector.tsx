@@ -11,6 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { contentText } from "@/lib/messages";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 
 interface Props {
@@ -20,19 +21,28 @@ interface Props {
 const TAB_DEFS = [
   { value: "events", label: "events" },
   { value: "spans", label: "spans" },
-  { value: "triage", label: "triage" },
   { value: "payload", label: "payload" },
 ] as const;
 
+/** Desktop rail — hidden below lg, where a toggleable sheet takes over. */
 export function Inspector({ events }: Props) {
   return (
     <aside
       data-testid="inspector"
-      className="w-[440px] shrink-0 border-l border-border/70 flex flex-col bg-muted/10"
+      className="w-[440px] shrink-0 border-l border-border/70 hidden lg:flex flex-col bg-muted/10"
     >
+      <InspectorBody events={events} />
+    </aside>
+  );
+}
+
+/** Header strip + tabs, shared by the desktop rail and the mobile sheet. */
+export function InspectorBody({ events }: Props) {
+  return (
+    <>
       <div className="px-3 py-2 border-b border-border/60 flex items-center justify-between">
         <div className="flex items-center gap-2 text-pico text-muted-foreground">
-          <span className="size-1.5 rounded-full bg-signal-info animate-signal" />
+          <span aria-hidden className="size-1.5 rounded-full bg-signal-info animate-signal" />
           <span>inspector</span>
           <span className="text-muted-foreground/40">·</span>
           <span className="text-foreground/80 tabular-nums normal-case tracking-[0.12em]">
@@ -61,14 +71,11 @@ export function Inspector({ events }: Props) {
         <TabsContent value="spans" className="flex-1 overflow-hidden m-0">
           <SpansTab events={events} />
         </TabsContent>
-        <TabsContent value="triage" className="flex-1 overflow-hidden m-0">
-          <TriageTab events={events} />
-        </TabsContent>
         <TabsContent value="payload" className="flex-1 overflow-hidden m-0">
           <PayloadTab events={events} />
         </TabsContent>
       </Tabs>
-    </aside>
+    </>
   );
 }
 
@@ -199,7 +206,7 @@ function summariseEvent(event: AiosEvent): string {
   const data = event.data;
   if (event.kind === "message") {
     const role = (data as { role?: string }).role ?? "?";
-    const content = (data as { content?: string }).content ?? "";
+    const content = contentText((data as { content?: unknown }).content);
     const tc = (data as { tool_calls?: { function?: { name?: string } }[] })
       .tool_calls;
     if (tc && tc.length) {
@@ -234,17 +241,20 @@ function SpansTab({ events }: { events: AiosEvent[] }) {
     }[] = [];
     for (const e of events) {
       if (e.kind !== "span") continue;
-      const d = e.data as {
-        event?: string;
-        model_request_start_id?: string;
-        model_usage?: Record<string, number>;
-        is_error?: boolean;
-      };
+      const d = e.data as { event?: string };
       if (d.event?.endsWith("_start")) {
         starts.set(e.id, e);
         pairs.push({ start: e, name: d.event.replace(/_start$/, "") });
-      } else if (d.event?.endsWith("_end") && d.model_request_start_id) {
-        const start = starts.get(d.model_request_start_id);
+      } else if (d.event?.endsWith("_end")) {
+        // Every *_end span carries a back-pointer named after its kind
+        // (model_request_start_id, step_start_id, context_build_start_id,
+        // …). Resolve it generically — handling only model_request left
+        // every other completed span stuck at "in flight…" forever.
+        const startId = Object.entries(e.data).find(([k]) =>
+          k.endsWith("_start_id"),
+        )?.[1];
+        if (typeof startId !== "string") continue;
+        const start = starts.get(startId);
         if (!start) continue;
         const pair = pairs.find((p) => p.start.id === start.id);
         if (!pair) continue;
@@ -302,12 +312,15 @@ function SpansTab({ events }: { events: AiosEvent[] }) {
 function SpanUsage({
   data,
 }: {
-  data: { model_usage?: Record<string, number>; is_error?: boolean };
+  data: {
+    model_usage?: Record<string, number>;
+    is_error?: boolean;
+    error_type?: string;
+  };
 }) {
   const usage = data.model_usage;
-  if (!usage) return null;
-  const entries = Object.entries(usage).filter(([, v]) => v > 0);
-  if (entries.length === 0) return null;
+  const entries = Object.entries(usage ?? {}).filter(([, v]) => v > 0);
+  if (entries.length === 0 && !data.is_error) return null;
   return (
     <div className="mt-1 text-muted-foreground grid grid-cols-2 gap-x-2">
       {entries.map(([k, v]) => (
@@ -316,78 +329,10 @@ function SpanUsage({
           <span>{v.toLocaleString()}</span>
         </div>
       ))}
-      {data.is_error && <span className="text-destructive">errored</span>}
-    </div>
-  );
-}
-
-// ── triage ────────────────────────────────────────────────────────────
-
-function TriageTab({ events }: { events: AiosEvent[] }) {
-  const decisions = useMemo(
-    () =>
-      events.filter(
-        (e) =>
-          e.kind === "lifecycle" &&
-          (e.data as { event?: string }).event === "triage_decision",
-      ),
-    [events],
-  );
-
-  const ref = useRef<HTMLDivElement>(null);
-  useStickToBottom(ref, decisions.length);
-
-  return (
-    <div ref={ref} className="h-full overflow-y-auto p-4">
-      {decisions.length === 0 ? (
-        <div className="text-xs text-muted-foreground font-mono space-y-2">
-          <div>(no triage decisions)</div>
-          <div className="text-muted-foreground/60">
-            configure an agent with a ``triage`` block to see per-message gate
-            verdicts here
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {decisions.map((e) => {
-            const d = e.data as {
-              decision?: string;
-              reason?: string;
-              reacting_to?: number;
-            };
-            const admit = d.decision === "respond";
-            return (
-              <div
-                key={e.id}
-                data-testid={`triage-${e.seq}`}
-                className={cn(
-                  "border rounded-md p-2 font-mono text-[10px]",
-                  admit
-                    ? "border-emerald-500/40 bg-emerald-500/5"
-                    : "border-amber-500/40 bg-amber-500/5",
-                )}
-              >
-                <div className="flex items-center justify-between">
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      "px-1 py-0 text-[9px] uppercase",
-                      admit ? "text-emerald-300" : "text-amber-300",
-                    )}
-                  >
-                    {d.decision ?? "?"}
-                  </Badge>
-                  <span className="text-muted-foreground">
-                    seq={e.seq} · reacting_to={d.reacting_to ?? "?"}
-                  </span>
-                </div>
-                <div className="mt-1 text-foreground/80">
-                  {d.reason || "(no reason)"}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      {data.is_error && (
+        <span className="text-destructive col-span-2">
+          errored{data.error_type ? `: ${data.error_type}` : ""}
+        </span>
       )}
     </div>
   );

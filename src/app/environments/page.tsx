@@ -3,30 +3,40 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/client";
 import type { Environment } from "@/lib/types";
-import { toErrorMessage } from "@/lib/utils";
+import { ErrorBanner } from "@/components/error-banner";
 import { NewEnvironmentDialog } from "@/components/new-environment-dialog";
 
 export default function EnvironmentsPage() {
   const [environments, setEnvironments] = useState<Environment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
 
-  const reload = useCallback(async () => {
+  // All state writes happen in promise callbacks, so the mount effect
+  // never sets state synchronously (initial state already shows loading).
+  const load = useCallback(
+    () =>
+      api
+        .listEnvironments()
+        .then((r) => {
+          setEnvironments(r.data);
+          setError(null);
+        })
+        .catch((e: unknown) => setError(e))
+        .finally(() => setLoading(false)),
+    [],
+  );
+
+  // Event-handler path (dialog creates): bring the spinner back
+  // immediately before refetching.
+  const reload = useCallback(() => {
     setLoading(true);
     setError(null);
-    try {
-      const r = await api.listEnvironments();
-      setEnvironments(r.data);
-    } catch (e) {
-      setError(toErrorMessage(e));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    void load();
+  }, [load]);
 
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    void load();
+  }, [load]);
 
   return (
     <main className="flex-1 min-w-0 overflow-y-auto">
@@ -34,7 +44,7 @@ export default function EnvironmentsPage() {
         <header className="flex items-end justify-between gap-4">
           <div className="space-y-3 min-w-0">
             <div className="flex items-center gap-2 text-pico text-muted-foreground">
-              <span className="text-signal">//</span>
+              <span className="text-signal">{"//"}</span>
               <span>resource/environments</span>
               <span className="text-muted-foreground/40">·</span>
               <span className="tabular-nums normal-case tracking-[0.12em]">
@@ -64,14 +74,12 @@ export default function EnvironmentsPage() {
             <span className="bracket-label">loading</span>…
           </div>
         )}
-        {error && (
-          <div
-            data-testid="environments-error"
-            className="border border-signal-alert/40 bg-signal-alert/5 rounded-sm px-4 py-3 font-mono text-[11px] text-signal-alert break-all"
-          >
-            <span className="bracket-label">fault</span>
-            {error}
-          </div>
+        {error != null && (
+          <ErrorBanner
+            error={error}
+            onRetry={reload}
+            testId="environments-error"
+          />
         )}
         {!loading && !error && environments.length === 0 && (
           <div className="rounded-sm border border-border/60 bg-card/30 backdrop-blur-sm overflow-hidden max-w-2xl">
