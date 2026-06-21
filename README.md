@@ -15,6 +15,20 @@ pnpm dev
 
 Open <http://localhost:3000>. The top nav shows **aios connected** (green dot) when it can reach the backend; if you see **aios unreachable** (red, pulsing), check that aios is running at `AIOS_URL` and the bearer token matches.
 
+## Ops dashboard (`/ops`)
+
+When `AIOS_RUNTIME_PATH` points at the live deployment repo (default `~/Code/aios-runtime`), the console exposes:
+
+- **`/ops`** — open watchdog incidents, session link, maintainer log tail
+- **Sidebar strip** — compact alert for open incidents on the sessions view
+- **`/api/ops/status`** — JSON probe used by the UI
+
+Set `AIOS_RUNTIME_PATH` in `.env.local` if the runtime repo lives elsewhere.
+
+## Session chat: channel provenance
+
+Inbound connector messages (Signal DMs, groups) show **colored provenance banners** so they are easy to distinguish from console/API traffic. Outbound `signal_send` replies are labeled separately. Metadata comes from `metadata.channel` on user events in the aios event log.
+
 ## Configuration
 
 Everything that changes per-deployment is an env var — no code edits required.
@@ -23,6 +37,8 @@ Everything that changes per-deployment is an env var — no code edits required.
 |---|---|---|
 | `AIOS_URL` | yes | Base URL of the aios API, e.g. `http://localhost:8090`. No trailing slash needed. |
 | `AIOS_API_KEY` | yes | Bearer token that matches `AIOS_API_KEY` in the aios backend's `.env`. |
+| `AIOS_RUNTIME_PATH` | no | Path to `aios-runtime` for `/ops` (default `~/Code/aios-runtime`). |
+| `CONSOLE_PASSWORD` | no | Operator login gate; required for non-loopback deploys. |
 
 **Model provider keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, etc.) do not belong here.** They belong in the aios backend's `.env` — that's the process that actually calls LiteLLM. The console never handles them.
 
